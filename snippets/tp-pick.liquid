@@ -1,0 +1,86 @@
+{%- comment -%}
+  Picks one live, in-stock accessory from a collection and outputs its handle ('' if none).
+  Params:
+    col      collection handle, e.g. 'modern-radiator-valves'
+    prefs    preferred title words, '/' separated, best first, e.g. 'universal click clack/click clack'
+    fins     finishes, ',' separated, best first (from tp-fins), e.g. 'brushed brass,chrome'
+    exclude  optional '|handle|' list to skip
+  The finish is the text after " – " in the accessory title ("... (Pair) – Brushed Brass").
+  Finish wins over preferred words: for each finish in turn, a preferred item in that finish,
+  else any item in that finish. Items with no finish in the title (e.g. a chiller tank) are
+  used last if they match a preferred word.
+{%- endcomment -%}
+{%- liquid
+  assign pk_col = collections[col]
+  assign pk_prefs = prefs | split: '/'
+  assign pk_fins = fins | split: ','
+  assign pk_ex = exclude | default: ''
+  assign pk_out = ''
+  if pk_col != blank and pk_col.products_count > 0
+    for pk_f in pk_fins
+      for pk_pr in pk_prefs
+        for pk_p in pk_col.products limit: 50
+          unless pk_p.available
+            continue
+          endunless
+          assign pk_key = '|' | append: pk_p.handle | append: '|'
+          if pk_ex contains pk_key
+            continue
+          endif
+          assign pk_fin = pk_p.title | split: ' – ' | last | downcase | strip
+          assign pk_t = pk_p.title | downcase
+          if pk_fin == pk_f and pk_t contains pk_pr
+            assign pk_out = pk_p.handle
+            break
+          endif
+        endfor
+        if pk_out != ''
+          break
+        endif
+      endfor
+      if pk_out == ''
+        for pk_p in pk_col.products limit: 50
+          unless pk_p.available
+            continue
+          endunless
+          assign pk_key = '|' | append: pk_p.handle | append: '|'
+          if pk_ex contains pk_key
+            continue
+          endif
+          assign pk_fin = pk_p.title | split: ' – ' | last | downcase | strip
+          if pk_fin == pk_f
+            assign pk_out = pk_p.handle
+            break
+          endif
+        endfor
+      endif
+      if pk_out != ''
+        break
+      endif
+    endfor
+    if pk_out == ''
+      for pk_pr in pk_prefs
+        for pk_p in pk_col.products limit: 50
+          unless pk_p.available
+            continue
+          endunless
+          assign pk_key = '|' | append: pk_p.handle | append: '|'
+          if pk_ex contains pk_key
+            continue
+          endif
+          assign pk_t = pk_p.title | downcase
+          unless pk_p.title contains ' – '
+            if pk_t contains pk_pr
+              assign pk_out = pk_p.handle
+              break
+            endif
+          endunless
+        endfor
+        if pk_out != ''
+          break
+        endif
+      endfor
+    endif
+  endif
+  echo pk_out
+-%}

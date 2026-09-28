@@ -1,0 +1,226 @@
+{%- comment -%}
+  TP essentials: "You'll need" row under Add to basket on bathroom pages (VP style).
+  1. If the product's custom.essentials list is filled in, those products are shown (manual override).
+  2. Otherwise items are picked automatically, matched to the product's finish (tp-fins + tp-pick):
+     Radiators          designer thermostatic valve pack + pipe sleeves
+                        (column / cast iron / traditional: traditional valves; Colenzo: matching feet)
+     Heated towel rails manual valves + dual fuel element kit + pipe sleeves
+                        (traditional rails: traditional valves)
+                        Electric and central-connection models get nothing (standard valves don't fit).
+     Basin taps         click-clack basin waste + bottle trap
+     Bath taps          click-clack bath waste
+     4-in-1 boiling     chiller tank
+     Shower sets        shower tray waste
+  Valves are skipped when "valve" is listed in What's in the box, wastes when "waste" is.
+  Only live, in-stock items show. Add buttons add the same quantity as the main quantity box.
+  Slots: collection handle ~ preferred title words ('/' separated) ~ label shown above the item ~ req/opt
+  ("Add all" appears when there are 2+ required items and only adds those.)
+{%- endcomment -%}
+{%- liquid
+  assign tpe_type = product.type | downcase
+  assign tpe_title = product.title | downcase
+  assign tpe_box = product.metafields.custom.whats_in_the_box.value | append: '' | downcase
+
+  capture tpe_fins
+    render 'tp-fins', product: product
+  endcapture
+  assign tpe_fins = tpe_fins | strip
+  assign tpe_fin_words = tpe_fins | split: ',' | first | split: ' '
+  assign tpe_fin_label = ''
+  for tpe_w in tpe_fin_words
+    assign tpe_cw = tpe_w | capitalize
+    assign tpe_fin_label = tpe_fin_label | append: tpe_cw | append: ' '
+  endfor
+  assign tpe_fin_label = tpe_fin_label | strip
+
+  assign tpe_cat = ''
+  if tpe_type contains 'towel rail'
+    assign tpe_cat = 'rail'
+  elsif tpe_type == 'radiator' or tpe_type == 'radiators'
+    assign tpe_cat = 'rad'
+  elsif tpe_type contains 'basin tap'
+    assign tpe_cat = 'basin'
+  elsif tpe_type contains 'bath tap' or tpe_type contains 'bath shower mixer'
+    assign tpe_cat = 'bath'
+  elsif tpe_type contains 'boiling water tap'
+    assign tpe_cat = 'boil'
+  elsif tpe_type contains 'shower set'
+    assign tpe_cat = 'shower'
+  endif
+
+  assign tpe_old = false
+  if tpe_title contains 'column' or tpe_title contains 'cast iron' or tpe_title contains 'traditional'
+    assign tpe_old = true
+  endif
+
+  assign tpe_slots = ''
+  assign tpe_sub = ''
+  case tpe_cat
+    when 'rad', 'rail'
+      unless tpe_title contains 'electric' or tpe_title contains 'central connection'
+        unless tpe_box contains 'valve'
+          if tpe_old
+            assign tpe_slots = tpe_slots | append: 'traditional-radiator-valves~wood-effect/cross head~Valves~req;'
+          elsif tpe_cat == 'rad'
+            assign tpe_slots = tpe_slots | append: 'thermostatic-radiator-valves~designer thermostatic/thermostatic~Valves~req;'
+          else
+            assign tpe_slots = tpe_slots | append: 'modern-radiator-valves~modern manual~Valves~req;'
+          endif
+        endunless
+        if tpe_cat == 'rail'
+          assign tpe_slots = tpe_slots | append: 'dual-fuel-heating-element-kits~heating element~Optional: dual fuel~opt;'
+        endif
+        if tpe_title contains 'colenzo'
+          assign tpe_slots = tpe_slots | append: 'radiator-stands~colenzo~Optional: floor feet~opt;'
+        endif
+        assign tpe_slots = tpe_slots | append: 'radiator-pipe-covers~pipe sleeves~Optional: pipe sleeves~opt;'
+        assign tpe_sub = 'Valves and fittings, matched to your ' | append: tpe_fin_label | append: ' finish where we have it'
+      endunless
+    when 'basin'
+      unless tpe_box contains 'waste' or tpe_title contains 'waste'
+        assign tpe_slots = 'basin-wastes~universal click clack/click clack~Basin waste~req;bottle-traps~adjustable round/adjustable~Bottle trap~req;'
+        assign tpe_sub = 'A waste and trap to finish your basin'
+      endunless
+    when 'bath'
+      unless tpe_box contains 'waste' or tpe_title contains 'waste'
+        assign tpe_slots = 'bath-wastes~easy clean click clack/click clack~Bath waste~req;'
+        assign tpe_sub = 'A matching click-clack bath waste'
+      endunless
+    when 'boil'
+      if tpe_title contains '4-in-1'
+        assign tpe_slots = 'boiling-water-tap-tanks-filters~chiller~Optional: chilled water~opt;'
+        assign tpe_sub = 'Add chilled water to your 4-in-1 tap'
+      endif
+    when 'shower'
+      assign tpe_slots = 'shower-wastes~fast flow~Optional: tray waste~opt;'
+      assign tpe_sub = 'Fitting a new tray? A waste in the same finish'
+  endcase
+  assign tpe_slots = tpe_slots | split: ';'
+
+  assign tpe_manual = product.metafields.custom.essentials.value
+-%}
+
+{%- capture tpe_rows -%}
+  {%- if tpe_manual != blank -%}
+    {%- for e in tpe_manual limit: 4 -%}
+      {%- if e.available and e.id != product.id -%}
+        <div class="tp-ess__row">
+          {%- if e.featured_image -%}{{ e.featured_image | image_url: width: 120 | image_tag: loading: 'lazy', class: 'tp-ess__img', alt: e.title }}{%- endif -%}
+          <span class="tp-ess__txt"><a class="tp-ess__t" href="{{ e.url }}">{{ e.title | escape }}</a></span>
+          <b class="tp-ess__p">{{ e.price | money }}</b>
+          <button type="button" class="tp-ess__add js-tp-ess" data-variant-id="{{ e.selected_or_first_available_variant.id }}"><span class="lbl">Add</span></button>
+        </div>
+      {%- endif -%}
+    {%- endfor -%}
+  {%- else -%}
+    {%- assign tpe_seen = '' -%}
+    {%- for slot in tpe_slots -%}
+      {%- if slot == blank -%}{%- continue -%}{%- endif -%}
+      {%- assign sp = slot | split: '~' -%}
+      {%- assign s_col = sp[0] -%}
+      {%- assign s_prefs = sp[1] -%}
+      {%- capture s_handle -%}{%- render 'tp-pick', col: s_col, prefs: s_prefs, fins: tpe_fins, exclude: tpe_seen -%}{%- endcapture -%}
+      {%- assign s_handle = s_handle | strip -%}
+      {%- if s_handle == '' -%}{%- continue -%}{%- endif -%}
+      {%- assign tpe_seen = tpe_seen | append: '|' | append: s_handle | append: '|' -%}
+      {%- assign s_pick = all_products[s_handle] -%}
+      {%- if s_pick == blank or s_pick.id == product.id -%}{%- continue -%}{%- endif -%}
+      <div class="tp-ess__row">
+        {%- if s_pick.featured_image -%}{{ s_pick.featured_image | image_url: width: 120 | image_tag: loading: 'lazy', class: 'tp-ess__img', alt: s_pick.title }}{%- endif -%}
+        <span class="tp-ess__txt">
+          <em class="tp-ess__role">{{ sp[2] }}</em>
+          <a class="tp-ess__t" href="{{ s_pick.url }}">{{ s_pick.title | escape }}</a>
+        </span>
+        <b class="tp-ess__p">{{ s_pick.price | money }}</b>
+        <button type="button" class="tp-ess__add js-tp-ess" data-variant-id="{{ s_pick.selected_or_first_available_variant.id }}"{% if sp[3] == 'req' %} data-req="1"{% endif %}><span class="lbl">Add</span></button>
+      </div>
+    {%- endfor -%}
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- assign tpe_rows = tpe_rows | strip -%}
+{%- if tpe_rows != '' -%}
+  {%- assign tpe_count = tpe_rows | split: 'data-req="1"' | size | minus: 1 -%}
+  <div class="tp-ess" data-tp-ess>
+    <div class="tp-ess__head">
+      <span class="tp-ess__h">You'll need</span>
+      {%- if tpe_sub != '' and tpe_manual == blank -%}<span class="tp-ess__sub">{{ tpe_sub }}</span>{%- endif -%}
+    </div>
+    {{ tpe_rows }}
+    {%- if tpe_count > 1 -%}
+      <button type="button" class="tp-ess__all js-tp-ess-all"><span class="lbl">{% if tpe_count == 2 %}Add both to basket{% else %}Add all {{ tpe_count }} to basket{% endif %}</span></button>
+    {%- endif -%}
+  </div>
+  <style>
+    .tp-ess{display:flex;flex-direction:column;gap:8px;margin:16px 0 0;font-family:"Open Sans",sans-serif;}
+    .tp-ess__head{display:flex;flex-direction:column;gap:2px;margin-bottom:2px;}
+    .tp-ess__h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;}
+    .tp-ess__sub{font-size:13px;color:#1a1d24;}
+    .tp-ess__row{display:flex;align-items:center;gap:10px;border:1px solid #e6e8eb;border-radius:11px;padding:8px 10px;}
+    .tp-ess__img{width:44px;height:44px;object-fit:cover;border-radius:6px;flex:0 0 auto;background:#f4f4f4;}
+    .tp-ess__txt{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;}
+    .tp-ess__role{font-style:normal;font-size:11px;font-weight:700;color:#1f8a4c;text-transform:uppercase;letter-spacing:.03em;}
+    .tp-ess__t{font-size:13px;font-weight:600;color:#1a1d24;text-decoration:none;line-height:1.3;}
+    .tp-ess__p{font-size:13px;font-weight:800;color:#1a1d24;white-space:nowrap;}
+    .tp-ess__add{flex:0 0 auto;background:#fff;border:1.5px solid #1f8a4c;color:#1f8a4c;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:800;cursor:pointer;}
+    .tp-ess__add:hover{background:#1f8a4c;color:#fff;}
+    .tp-ess__add[disabled],.tp-ess__all[disabled]{opacity:.6;cursor:not-allowed;}
+    .tp-ess__all{background:#1f8a4c;border:0;color:#fff;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:800;cursor:pointer;}
+    .tp-ess__all:hover{background:#18703d;}
+  </style>
+  <script>
+  (function(){
+    function mainQty(el){
+      var form = el.closest('form');
+      var q = form ? form.querySelector('[name="quantity"]') : null;
+      var n = q ? parseInt(q.value, 10) : 1;
+      return (n && n > 0) ? n : 1;
+    }
+    function add(ids, qty){
+      return fetch('/cart/add.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: ids.map(function(id){ return { id: id, quantity: qty, properties: { '_cross_sell_source': 'pdp_essentials' } }; }) })
+      }).then(function(r){ if(!r.ok){ throw new Error('add failed'); } return r.json(); });
+    }
+    function done(btn, text, reset){
+      var lbl = btn.querySelector('.lbl');
+      if(lbl){ lbl.textContent = text; }
+      document.documentElement.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
+      setTimeout(function(){ btn.disabled = false; if(lbl){ lbl.textContent = reset; } }, 2000);
+    }
+    document.querySelectorAll('[data-tp-ess]').forEach(function(box){
+      if(box.__tpBound){ return; }
+      box.__tpBound = true;
+      box.querySelectorAll('.js-tp-ess').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var id = btn.getAttribute('data-variant-id');
+          if(!id){ return; }
+          btn.disabled = true;
+          var lbl = btn.querySelector('.lbl'); if(lbl){ lbl.textContent = 'Adding…'; }
+          add([id], mainQty(btn)).then(function(){ done(btn, 'Added', 'Add'); }).catch(function(){
+            btn.disabled = false; if(lbl){ lbl.textContent = 'Add'; }
+            alert('Sorry, that item could not be added. Please try again.');
+          });
+        });
+      });
+      var all = box.querySelector('.js-tp-ess-all');
+      if(all){
+        var allLbl = all.querySelector('.lbl');
+        var allText = allLbl.textContent;
+        all.addEventListener('click', function(){
+          var ids = [];
+          box.querySelectorAll('.js-tp-ess[data-req]').forEach(function(b){ var id = b.getAttribute('data-variant-id'); if(id){ ids.push(id); } });
+          if(!ids.length){ return; }
+          all.disabled = true;
+          allLbl.textContent = 'Adding…';
+          add(ids, mainQty(all)).then(function(){ done(all, 'Added to basket', allText); }).catch(function(){
+            all.disabled = false; allLbl.textContent = allText;
+            alert('Sorry, those items could not be added. Please try again.');
+          });
+        });
+      }
+    });
+  })();
+  </script>
+{%- endif -%}

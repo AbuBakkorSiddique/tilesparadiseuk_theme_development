@@ -1,0 +1,16 @@
+{%- comment -%}
+  Spec table fields per template. Format: metafield key (custom namespace)|Label, separated by ;
+  Only fields with a value are shown. Existing store metafields are listed first.
+{%- endcomment -%}
+{%- case cat -%}
+  {%- when 'taps', 'kitchen-taps' -%}type|Tap type;mounting|Mounting;shape|Shape;height|Height;width|Width;min_water_pressure|Minimum water pressure;boiler_compatibility|Boiler / system compatibility;connection_size|Connection size;guarantee|Guarantee
+  {%- when 'boiling-taps' -%}type|Type;tank_capacity|Tank capacity;filter_life|Filter life;power|Power;min_water_pressure|Minimum water pressure;boiler_compatibility|Boiler / system compatibility;connection_size|Connection size;guarantee|Guarantee
+  {%- when 'toilets' -%}toilet_type|Toilet type;pan_design|Pan design;shape|Shape;style|Style;flush_type|Flush type;comfort_height|Comfort height;projection|Projection;width|Width;height|Height;guarantee|Guarantee
+  {%- when 'shower' -%}shower_type|Shower type;outlets|Outlets;head_size|Shower head size;handset_type|Handset;shape|Shape;min_water_pressure|Minimum water pressure;boiler_compatibility|Boiler / system compatibility;connection_size|Connection size;guarantee|Guarantee
+  {%- when 'mirrors' -%}width|Width;height|Height;shape|Shape;orientation|Orientation;design|Design;frame_type|Frame;lighting|Lighting;color_temprature|Colour temperature;dimmable|Dimmable;demister|Demister;control|Control;bluetooth|Bluetooth;shaver_socket|Shaver socket;power|Power;mounting|Mounting;guarantee|Guarantee
+  {%- when 'radiator-v3' -%}type|Type;width|Width;height|Height;panel_options|Panels;heat_output|Heat output;power_type|Heating type;valve_position|Connection position;valve_style|Valve style;connection_size|Connection size;weight|Weight;guarantee|Guarantee
+  {%- when 'towel-rails' -%}type|Type;width|Width;height|Height;heat_output|Heat output;power_type|Heating type;valve_position|Connection position;valve_style|Valve style;connection_size|Connection size;weight|Weight;guarantee|Guarantee
+  {%- when 'radiator-valves' -%}type|Valve type;valve_style|Style;valve_position|Position;connection_size|Connection size;guarantee|Guarantee
+  {%- when 'wastes' -%}type|Type;shape|Shape;connection_size|Thread / connection size;guarantee|Guarantee
+  {%- when 'bath-accessories' -%}type|Item;mounting|Fixing;shape|Shape;width|Width;height|Height;guarantee|Guarantee
+{%- endcase -%}

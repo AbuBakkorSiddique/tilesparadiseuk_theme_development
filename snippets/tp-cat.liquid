@@ -1,0 +1,53 @@
+{%- comment -%}
+  Outputs the help/FAQ category for a product: tiles, taps, kitchen-taps, boiling-taps, shower,
+  toilets, mirrors, radiator-v3, towel-rails, radiator-valves, wastes, bath-accessories,
+  or nothing (adhesive, grout, boards, samples, deals).
+  Product type wins over the template, so products still on an older template (e.g. Oriana
+  accessories on the taps template) get the right help and FAQs.
+{%- endcomment -%}
+{%- liquid
+  capture tc_pm
+    render 'tp-per-m', product: product
+  endcapture
+  assign tc_pm = tc_pm | strip
+  assign tc_t = product.type | downcase
+  assign tc_s = product.template_suffix | default: ''
+  assign tc = ''
+  if tc_pm == 'y'
+    assign tc = 'tiles'
+  elsif tc_t contains 'shower accessor'
+    assign tc = 'shower'
+  elsif tc_t contains 'accessor'
+    assign tc = 'bath-accessories'
+  elsif tc_t contains 'towel rail'
+    assign tc = 'towel-rails'
+  elsif tc_t contains 'radiator valve'
+    assign tc = 'radiator-valves'
+  elsif tc_t == 'radiator' or tc_t == 'radiators'
+    assign tc = 'radiator-v3'
+  elsif tc_t contains 'waste'
+    assign tc = 'wastes'
+  elsif tc_t contains 'boiling'
+    assign tc = 'boiling-taps'
+  elsif tc_t contains 'kitchen tap'
+    assign tc = 'kitchen-taps'
+  elsif tc_t contains 'shower'
+    assign tc = 'shower'
+  elsif tc_t contains 'tap' or tc_t contains 'mixer'
+    assign tc = 'taps'
+  elsif tc_t contains 'toilet'
+    assign tc = 'toilets'
+  else
+    case tc_s
+      when 'mirrors-v2', 'mirrors', 'led-mirrors'
+        assign tc = 'mirrors'
+      when 'showers', 'shower'
+        assign tc = 'shower'
+      when 'radiators', 'radiator-v3'
+        assign tc = 'radiator-v3'
+      when 'taps', 'kitchen-taps', 'boiling-taps', 'toilets', 'towel-rails', 'radiator-valves', 'wastes', 'bath-accessories'
+        assign tc = tc_s
+    endcase
+  endif
+  echo tc
+-%}

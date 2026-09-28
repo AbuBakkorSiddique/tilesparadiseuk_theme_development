@@ -1,0 +1,66 @@
+{%- comment -%}
+  TP free-delivery progress bar (cart page).
+  Only items on the General shipping profile count (tiles, adhesive, grout, boards, radiators,
+  toilets...): they cost £39.99 to deliver under £500 and ship free from £500. Items with their
+  own delivery (towel rails, showers, Kartell, LED mirrors, samples - see tp-own-delivery)
+  are left out of the sum, so the bar never promises free delivery the checkout won't give.
+  Params: style  'top' (slim bar above the basket) or 'recap' (inside the order summary)
+  Threshold and saving live here; keep them in step with the "Free Standard" and
+  "Standard" rates in Shopify shipping settings.
+{%- endcomment -%}
+{%- liquid
+  assign tfd_threshold = 50000
+  assign tfd_saving = 3999
+  assign tfd_sub = 0
+  assign tfd_has = false
+  assign tfd_own = false
+  for li in cart.items
+    capture tfd_o
+      render 'tp-own-delivery', product: li.product
+    endcapture
+    assign tfd_o = tfd_o | strip
+    if tfd_o == 'y' or li.requires_shipping == false
+      assign tfd_own = true
+    else
+      assign tfd_has = true
+      assign tfd_sub = tfd_sub | plus: li.final_line_price
+    endif
+  endfor
+  assign tfd_left = tfd_threshold | minus: tfd_sub
+  if tfd_left < 0
+    assign tfd_left = 0
+  endif
+  assign tfd_pct = tfd_sub | times: 100 | divided_by: tfd_threshold
+  if tfd_pct > 100
+    assign tfd_pct = 100
+  endif
+  assign tfd_style = style | default: 'top'
+-%}
+{%- if tfd_has -%}
+  <div class="tp-fd tp-fd--{{ tfd_style }}{% if tfd_left == 0 %} is-free{% endif %}">
+    <p class="tp-fd__msg">
+      {%- if tfd_left == 0 -%}
+        <strong>Free delivery unlocked</strong>, saving you {{ tfd_saving | money }}.
+      {%- else -%}
+        Spend <strong>{{ tfd_left | money }}</strong> more for <strong>free delivery</strong> <span class="tp-fd__save">(saves {{ tfd_saving | money }})</span>
+      {%- endif -%}
+    </p>
+    <div class="tp-fd__track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ tfd_pct }}" aria-label="Progress towards free delivery"><span class="tp-fd__fill" style="width:{{ tfd_pct }}%"></span></div>
+    {%- if tfd_own and tfd_left > 0 -%}
+      <p class="tp-fd__note">Some items in your basket, like towel rails, showers and samples, ship on their own rate and don't count towards this.</p>
+    {%- endif -%}
+  </div>
+  <style>
+    .tp-fd{font-family:"Open Sans",sans-serif;border:1px solid #e6e8eb;border-radius:12px;padding:12px 14px;background:#fff;}
+    .tp-fd--top{max-width:760px;margin:0 auto 18px;}
+    .tp-fd--recap{margin:0 0 16px;}
+    .tp-fd__msg{margin:0 0 8px;font-size:14px;color:#1a1d24;line-height:1.4;}
+    .tp-fd__msg strong{font-weight:800;}
+    .tp-fd__save{color:#6b7280;font-weight:600;font-size:13px;}
+    .tp-fd__track{height:8px;border-radius:999px;background:#eef0f2;overflow:hidden;}
+    .tp-fd__fill{display:block;height:100%;border-radius:999px;background:#c8102e;transition:width .3s;}
+    .tp-fd.is-free{border-color:#bfe3cc;background:#f3fbf6;}
+    .tp-fd.is-free .tp-fd__fill{background:#1f8a4c;}
+    .tp-fd__note{margin:8px 0 0;font-size:12px;color:#6b7280;line-height:1.4;}
+  </style>
+{%- endif -%}

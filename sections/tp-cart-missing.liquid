@@ -1,0 +1,320 @@
+{%- comment -%}
+  TP missing parts (cart page). Looks at what's in the basket and flags parts that are
+  usually needed but missing, matched to each item's finish:
+    radiator / heated towel rail  -> valves (not for electric or central-connection models,
+                                     or when "valve" is listed in What's in the box)
+    basin tap                     -> click-clack basin waste
+    bath tap / bath shower mixer  -> click-clack bath waste
+    tiles (per m²) and pallet deals -> adhesive and grout for the total m² in the basket
+                                     (20kg adhesive: 3.5 m² per bag for 60x120 and bigger, 4.5 m²
+                                     for 60x60 / 30x60, 5.5 m² for smaller - same as the tiling kit;
+                                     5kg grout: 25 m² per bag, 10 m² for small tiles;
+                                     grout colour picked from the first tile's colour)
+  A row only shows if the basket has none of that part yet and a live, in-stock match exists.
+  "Add" adds the same quantity as the item it's for (or the worked-out bags), then reloads the cart.
+{%- endcomment -%}
+{%- liquid
+  assign tcm_has_valve = false
+  assign tcm_has_basin_waste = false
+  assign tcm_has_bath_waste = false
+  for li in cart.items
+    assign lt = li.product.type | downcase
+    assign ltt = li.product.title | downcase
+    if lt contains 'radiator valve'
+      assign tcm_has_valve = true
+    endif
+    if lt contains 'waste'
+      if ltt contains 'bath'
+        assign tcm_has_bath_waste = true
+      elsif ltt contains 'basin'
+        assign tcm_has_basin_waste = true
+      endif
+    endif
+  endfor
+  assign tcm_seen = ''
+-%}
+
+{%- liquid
+  assign tcm_m2 = 0
+  assign tcm_has_adh = false
+  assign tcm_has_grout = false
+  assign tcm_found = false
+  assign tcm_tsize = ''
+  assign tcm_tcol = ''
+  assign tcm_materials = 'adhesive,grout,backer,board,primer,levelling,clip,spacer,trim,sealant,membrane,matting'
+  assign tcm_materials = tcm_materials | split: ','
+  for li in cart.items
+    assign ltt = li.product.title | downcase
+    if ltt contains 'adhesive'
+      assign tcm_has_adh = true
+    endif
+    if ltt contains 'grout'
+      assign tcm_has_grout = true
+    endif
+    assign l_mat = false
+    for w in tcm_materials
+      if ltt contains w
+        assign l_mat = true
+        break
+      endif
+    endfor
+    if l_mat
+      continue
+    endif
+    capture lpm
+      render 'tp-per-m', product: li.product
+    endcapture
+    assign lpm = lpm | strip
+    assign l_m2 = 0
+    if lpm == 'y'
+      unless ltt contains 'spc' or ltt contains 'vinyl' or ltt contains 'laminate'
+        assign l_m2 = li.quantity
+      endunless
+    elsif ltt contains 'pallet' and ltt contains 'sq'
+      assign pm2 = ltt | split: 'sq' | first | split: '(' | last | strip | split: ' ' | last | plus: 0
+      if pm2 > 0
+        assign l_m2 = pm2 | times: li.quantity
+      endif
+    endif
+    if l_m2 > 0
+      assign tcm_m2 = tcm_m2 | plus: l_m2
+      unless tcm_found
+        assign tcm_found = true
+        assign tcm_tsize = li.product.metafields.custom.size.value | append: ' ' | append: li.product.title | downcase
+        assign tcm_tcol = li.product.metafields.custom.tile_color.value | append: '' | downcase | split: ',' | first | strip
+      endunless
+    endif
+  endfor
+
+  assign tcm_adh_h = ''
+  assign tcm_grout_h = ''
+  if tcm_m2 > 0
+    assign tcm_sz = tcm_tsize
+    assign tcm_small = true
+    if tcm_sz contains '60x' or tcm_sz contains 'x60' or tcm_sz contains '80x' or tcm_sz contains '90x' or tcm_sz contains '120'
+      assign tcm_small = false
+    endif
+    unless tcm_has_adh
+      assign tcm_adh_list = 'mapei-keraquick-grey-rapid-setting-adhesive-20kg,ultra-tile-fix-proflex-sp-rapid-set-grey-adhesive-20kg,mapei-keraflex-maxi-s1-grey-adhesive-20kg' | split: ','
+      for h in tcm_adh_list
+        if all_products[h].available
+          assign tcm_adh_h = h
+          break
+        endif
+      endfor
+      if tcm_sz contains '120' or tcm_sz contains '80x80' or tcm_sz contains '90x90' or tcm_sz contains '100x'
+        assign tcm_adh_q = tcm_m2 | divided_by: 3.5 | ceil
+      elsif tcm_small
+        assign tcm_adh_q = tcm_m2 | divided_by: 5.5 | ceil
+      else
+        assign tcm_adh_q = tcm_m2 | divided_by: 4.5 | ceil
+      endif
+    endunless
+    unless tcm_has_grout
+      case tcm_tcol
+        when 'black'
+          assign gh = 'mapei-ultracolor-plus-120-black-tile-grout-5kg'
+        when 'anthracite', 'charcoal'
+          assign gh = 'mapei-ultracolor-plus-114-anthracite-tile-grout-5-kg'
+        when 'grey', 'gray', 'silver'
+          assign gh = 'copy-of-mapei-ultracolor-plus-111-silver-grey-tile-grout-5kg'
+        when 'beige', 'cream', 'brown', 'taupe', 'terracotta'
+          assign gh = 'mapei-ultracolor-plus-132-beige-tile-grout-5kg'
+        else
+          assign gh = 'mapei-ultracolor-plus-100-white-tile-grout-5kg'
+      endcase
+      if all_products[gh].available
+        assign tcm_grout_h = gh
+      elsif all_products['copy-of-mapei-ultracolor-plus-111-silver-grey-tile-grout-5kg'].available
+        assign tcm_grout_h = 'copy-of-mapei-ultracolor-plus-111-silver-grey-tile-grout-5kg'
+      endif
+      if tcm_small
+        assign tcm_grout_q = tcm_m2 | divided_by: 10.0 | ceil
+      else
+        assign tcm_grout_q = tcm_m2 | divided_by: 25.0 | ceil
+      endif
+      if tcm_grout_q < 1
+        assign tcm_grout_q = 1
+      endif
+    endunless
+  endif
+  assign tcm_m2_label = tcm_m2 | round: 1
+-%}
+
+{%- capture tcm_rows -%}
+  {%- if tcm_adh_h != '' -%}
+    {%- assign tcm_adh = all_products[tcm_adh_h] -%}
+    <div class="tcm__row">
+      {%- if tcm_adh.featured_image -%}{{ tcm_adh.featured_image | image_url: width: 120 | image_tag: loading: 'lazy', class: 'tcm__img', alt: tcm_adh.title }}{%- endif -%}
+      <span class="tcm__txt">
+        <em>Adhesive for your {{ tcm_m2_label }} m² of tiles</em>
+        <a href="{{ tcm_adh.url }}">{{ tcm_adh.title | escape }}</a>
+      </span>
+      <b class="tcm__p">{{ tcm_adh.price | times: tcm_adh_q | money }}{% if tcm_adh_q > 1 %}<small> ({{ tcm_adh_q }} × {{ tcm_adh.price | money }})</small>{% endif %}</b>
+      <button type="button" class="tcm__add js-tcm-add" data-variant-id="{{ tcm_adh.selected_or_first_available_variant.id }}" data-qty="{{ tcm_adh_q }}"><span class="lbl">Add</span></button>
+    </div>
+  {%- endif -%}
+  {%- if tcm_grout_h != '' -%}
+    {%- assign tcm_grout = all_products[tcm_grout_h] -%}
+    <div class="tcm__row">
+      {%- if tcm_grout.featured_image -%}{{ tcm_grout.featured_image | image_url: width: 120 | image_tag: loading: 'lazy', class: 'tcm__img', alt: tcm_grout.title }}{%- endif -%}
+      <span class="tcm__txt">
+        <em>Grout for your {{ tcm_m2_label }} m² of tiles</em>
+        <a href="{{ tcm_grout.url }}">{{ tcm_grout.title | escape }}</a>
+        <a class="tcm__alt" href="{{ collections['grout'].url | default: '/collections/grout' }}">Other colours</a>
+      </span>
+      <b class="tcm__p">{{ tcm_grout.price | times: tcm_grout_q | money }}{% if tcm_grout_q > 1 %}<small> ({{ tcm_grout_q }} × {{ tcm_grout.price | money }})</small>{% endif %}</b>
+      <button type="button" class="tcm__add js-tcm-add" data-variant-id="{{ tcm_grout.selected_or_first_available_variant.id }}" data-qty="{{ tcm_grout_q }}"><span class="lbl">Add</span></button>
+    </div>
+  {%- endif -%}
+  {%- for li in cart.items -%}
+    {%- liquid
+      assign lp = li.product
+      assign lt = lp.type | downcase
+      assign ltt = lp.title | downcase
+      assign lbox = lp.metafields.custom.whats_in_the_box.value | append: '' | downcase
+      assign need_col = ''
+      assign need_pref = ''
+      assign need_what = ''
+      if lt contains 'towel rail' or lt == 'radiator' or lt == 'radiators'
+        unless tcm_has_valve or ltt contains 'electric' or ltt contains 'central connection' or lbox contains 'valve'
+          if ltt contains 'column' or ltt contains 'cast iron' or ltt contains 'traditional'
+            assign need_col = 'traditional-radiator-valves'
+            assign need_pref = 'wood-effect/cross head'
+          elsif lt contains 'towel rail'
+            assign need_col = 'modern-radiator-valves'
+            assign need_pref = 'modern manual'
+          else
+            assign need_col = 'thermostatic-radiator-valves'
+            assign need_pref = 'designer thermostatic/thermostatic'
+          endif
+          assign need_what = 'Valves'
+        endunless
+      elsif lt contains 'basin tap'
+        unless tcm_has_basin_waste or lbox contains 'waste' or ltt contains 'waste'
+          assign need_col = 'basin-wastes'
+          assign need_pref = 'universal click clack/click clack'
+          assign need_what = 'Basin waste'
+        endunless
+      elsif lt contains 'bath tap' or lt contains 'bath shower mixer'
+        unless tcm_has_bath_waste or lbox contains 'waste' or ltt contains 'waste'
+          assign need_col = 'bath-wastes'
+          assign need_pref = 'easy clean click clack/click clack'
+          assign need_what = 'Bath waste'
+        endunless
+      endif
+    -%}
+    {%- if need_col == '' -%}{%- continue -%}{%- endif -%}
+    {%- capture lfins -%}{%- render 'tp-fins', product: lp -%}{%- endcapture -%}
+    {%- assign lfins = lfins | strip -%}
+    {%- capture lh -%}{%- render 'tp-pick', col: need_col, prefs: need_pref, fins: lfins, exclude: tcm_seen -%}{%- endcapture -%}
+    {%- assign lh = lh | strip -%}
+    {%- if lh == '' -%}{%- continue -%}{%- endif -%}
+    {%- assign tcm_seen = tcm_seen | append: '|' | append: lh | append: '|' -%}
+    {%- assign sp = all_products[lh] -%}
+    {%- if sp == blank -%}{%- continue -%}{%- endif -%}
+    <div class="tcm__row">
+      {%- if sp.featured_image -%}{{ sp.featured_image | image_url: width: 120 | image_tag: loading: 'lazy', class: 'tcm__img', alt: sp.title }}{%- endif -%}
+      <span class="tcm__txt">
+        <em>{{ need_what }} for your {{ lp.title | truncate: 60 | escape }}</em>
+        <a href="{{ sp.url }}">{{ sp.title | escape }}</a>
+      </span>
+      <b class="tcm__p">{{ sp.price | times: li.quantity | money }}{% if li.quantity > 1 %}<small> ({{ li.quantity }} × {{ sp.price | money }})</small>{% endif %}</b>
+      <button type="button" class="tcm__add js-tcm-add" data-variant-id="{{ sp.selected_or_first_available_variant.id }}" data-qty="{{ li.quantity }}"><span class="lbl">Add</span></button>
+    </div>
+  {%- endfor -%}
+{%- endcapture -%}
+
+{%- assign tcm_rows = tcm_rows | strip -%}
+{%- comment -%} Free-delivery progress bar (only counts items on the pallet delivery rate, see tp-free-delivery).
+  It replaces the theme's own free-shipping text, which is switched off in Theme settings > Cart. {%- endcomment -%}
+{%- capture tcm_fd -%}{%- render 'tp-free-delivery', style: 'top' -%}{%- endcapture -%}
+{%- if tcm_fd != blank -%}
+  <div class="tcm-fd page-width">{{ tcm_fd }}</div>
+  <style>.tcm-fd{margin-top:20px;}.tcm-fd .tp-fd--top{margin-bottom:0;}</style>
+{%- endif -%}
+{%- if tcm_rows != '' -%}
+<section class="tcm page-width {{ section.settings.custom_class }}" data-section-id="{{ section.id }}">
+  <div class="tcm__box">
+    <div class="tcm__head">
+      <strong>{{ section.settings.heading | default: 'Before you check out' }}</strong>
+      <span>{{ section.settings.subheading | default: "These are usually needed to fit what's in your basket, and they're not in it yet." }}</span>
+    </div>
+    {{ tcm_rows }}
+  </div>
+</section>
+<style>
+  .tcm{margin-top:24px;margin-bottom:8px;}
+  .tcm__box{border:1.5px solid #f2c94c;background:#fffbea;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;font-family:"Open Sans",sans-serif;}
+  .tcm__head strong{display:block;font-size:15px;color:#1a1d24;}
+  .tcm__head span{display:block;font-size:13px;color:#4b5563;margin-top:2px;}
+  .tcm__row{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #eee3b8;border-radius:10px;padding:8px 10px;}
+  .tcm__img{width:48px;height:48px;object-fit:cover;border-radius:6px;flex:0 0 auto;background:#f4f4f4;}
+  .tcm__txt{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;}
+  .tcm__txt em{font-style:normal;font-size:11px;font-weight:700;color:#8a6d00;text-transform:uppercase;letter-spacing:.03em;}
+  .tcm__txt a{font-size:13.5px;font-weight:600;color:#1a1d24;text-decoration:none;line-height:1.3;}
+  .tcm__txt a.tcm__alt{font-size:12px;font-weight:600;color:#016FD0;text-decoration:underline;margin-top:2px;}
+  .tcm__p{font-size:14px;font-weight:800;color:#1a1d24;white-space:nowrap;}
+  .tcm__p small{font-weight:600;color:#6b7280;font-size:11px;}
+  .tcm__add{flex:0 0 auto;background:#1f8a4c;border:0;color:#fff;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:800;cursor:pointer;}
+  .tcm__add:hover{background:#18703d;}
+  .tcm__add[disabled]{opacity:.6;cursor:not-allowed;}
+  @media (max-width:560px){ .tcm__row{flex-wrap:wrap;} .tcm__txt{flex-basis:calc(100% - 60px);} .tcm__p{margin-left:60px;} .tcm__add{margin-left:auto;} }
+</style>
+<script>
+(function(){
+  document.querySelectorAll('.js-tcm-add').forEach(function(btn){
+    if(btn.__tcmBound){ return; }
+    btn.__tcmBound = true;
+    btn.addEventListener('click', function(){
+      var id = btn.getAttribute('data-variant-id');
+      var qty = parseInt(btn.getAttribute('data-qty'), 10) || 1;
+      if(!id){ return; }
+      btn.disabled = true;
+      var lbl = btn.querySelector('.lbl'); if(lbl){ lbl.textContent = 'Adding…'; }
+      fetch('/cart/add.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: [{ id: id, quantity: qty, properties: { '_cross_sell_source': 'cart_missing_parts' } }] })
+      })
+      .then(function(r){ if(!r.ok){ throw new Error('add failed'); } return r.json(); })
+      .then(function(){ window.location.reload(); })
+      .catch(function(){
+        btn.disabled = false; if(lbl){ lbl.textContent = 'Add'; }
+        alert('Sorry, that item could not be added. Please try again.');
+      });
+    });
+  });
+})();
+</script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "TP missing parts",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Before you check out"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "These are usually needed to fit what's in your basket, and they're not in it yet."
+    },
+    {
+      "type": "text",
+      "id": "custom_class",
+      "label": "Custom CSS class"
+    }
+  ],
+  "presets": [
+    {
+      "name": "TP missing parts"
+    }
+  ]
+}
+{% endschema %}

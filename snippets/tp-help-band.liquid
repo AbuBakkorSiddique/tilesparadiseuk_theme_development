@@ -1,0 +1,67 @@
+{%- comment -%}
+  TP help & FAQs band, rendered at the bottom of the product-tabs section on every product page.
+  Left: Help choosing (tp-help-choosing), right: FAQs for the category (tp-category-faqs).
+  The category comes from tp-cat. Adhesive, grout, samples and deals get nothing.
+  Params: product, show_faqs (false on LED mirrors, which keep their own FAQ tab)
+{%- endcomment -%}
+{%- capture tph_cat -%}{%- render 'tp-cat', product: product -%}{%- endcapture -%}
+{%- assign tph_cat = tph_cat | strip -%}
+{%- if tph_cat != '' -%}
+  {%- assign tph_faq = '' -%}
+  {%- if show_faqs != false -%}
+    {%- capture tph_faq -%}{%- render 'tp-category-faqs', cat: tph_cat, product: product -%}{%- endcapture -%}
+    {%- assign tph_faq = tph_faq | strip -%}
+  {%- endif -%}
+  <section class="tp-help">
+    <div class="tp-help__in{% if tph_faq == '' %} tp-help__in--one{% endif %}">
+      <div class="tp-help__col tp-help__col--guide">
+        <h2 class="tp-help__h">Help choosing</h2>
+        {%- render 'tp-help-choosing', product: product, cat: tph_cat -%}
+      </div>
+      {%- if tph_faq != '' -%}
+        <div class="tp-help__col tp-help__col--faq">
+          <h2 class="tp-help__h">Questions people ask</h2>
+          <div class="tp-faq">{{ tph_faq }}</div>
+        </div>
+      {%- endif -%}
+    </div>
+  </section>
+  <style>
+    .tp-help{font-family:"Open Sans",sans-serif;padding:36px 16px;background:#f7f8f9;}
+    .tp-help__in{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start;}
+    @media (max-width:899px){.tp-help__in{grid-template-columns:minmax(0,1fr);gap:22px;}}
+    .tp-help__in--one{grid-template-columns:minmax(0,1fr);max-width:760px;}
+    .tp-help__col{background:#fff;border:1px solid #e6e8eb;border-radius:14px;padding:20px;}
+    .tp-help__h{margin:0 0 14px;font-size:20px;font-weight:800;color:#1a1d24;letter-spacing:-.01em;}
+    .tp-hc{font-size:14px;color:#1a1d24;line-height:1.5;}
+    .tp-hc__lead{margin:0 0 12px;}
+    .tp-hc__facts{list-style:none;margin:0 0 14px;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+    .tp-hc__facts li{margin:0;padding:8px 10px;background:#f7f8f9;border-radius:8px;display:flex;flex-direction:column;}
+    .tp-hc__facts li::before{display:none;}
+    .tp-hc__facts span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;}
+    .tp-hc__facts b{font-size:13.5px;font-weight:700;}
+    .tp-hc__facts--list{grid-template-columns:minmax(0,1fr);}
+    .tp-hc__steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;}
+    .tp-hc__steps li{padding-left:2px;}
+    .tp-hc__tool{border:1.5px solid #dbe7f5;background:#f5f9fe;border-radius:12px;padding:14px;margin:0 0 16px;}
+    .tp-hc__tool-h{font-size:14px;font-weight:800;margin-bottom:10px;}
+    .tp-hc__fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+    @media (max-width:560px){.tp-hc__fields{grid-template-columns:repeat(2,minmax(0,1fr));}}
+    .tp-hc__fields label{display:flex;flex-direction:column;gap:4px;margin:0;font-size:12px;font-weight:700;color:#4b5563;}
+    .tp-hc__fields label.tp-hc__wide{grid-column:1 / -1;}
+    .tp-hc__fields input,.tp-hc__fields select{height:38px;padding:0 10px;border:1.5px solid #d5dbe1;border-radius:8px;background:#fff;font-size:14px;font-weight:600;color:#1a1d24;width:100%;}
+    .tp-hc__fields input:focus,.tp-hc__fields select:focus{outline:none;border-color:#016FD0;}
+    .tp-hc__out{margin:12px 0 0;padding:10px 12px;border-radius:8px;background:#fff;font-size:13.5px;}
+    .tp-hc__out.is-good{background:#eaf7ef;color:#155f35;}
+    .tp-hc__out.is-warn{background:#fff4e0;color:#7a4a00;}
+    .tp-hc__ask{margin:14px 0 0;font-size:13px;color:#4b5563;}
+    .tp-hc__ask a{color:#016FD0;font-weight:700;}
+    .tp-help .tp-faq{display:flex;flex-direction:column;gap:8px;}
+    .tp-help .tp-faq__i{border:1px solid #e6e8eb;border-radius:10px;background:#fff;}
+    .tp-help .tp-faq__i summary{cursor:pointer;list-style:none;padding:12px 40px 12px 14px;font-size:14px;font-weight:700;color:#1a1d24;position:relative;}
+    .tp-help .tp-faq__i summary::-webkit-details-marker{display:none;}
+    .tp-help .tp-faq__i summary::after{content:"+";position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:20px;font-weight:600;color:#6b7280;}
+    .tp-help .tp-faq__i[open] summary::after{content:"\2212";}
+    .tp-help .tp-faq__a{padding:0 14px 14px;font-size:13.5px;line-height:1.55;color:#374151;}
+  </style>
+{%- endif -%}

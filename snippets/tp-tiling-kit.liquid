@@ -1,0 +1,462 @@
+{%- comment -%}
+  TP tiling kit (tile product pages, under Add to basket).
+  Works out adhesive, grout and fixing extras for the area typed into the tile calculator,
+  lets the customer tick what they want and adds it all in one click.
+
+  How it decides (all editable below in the ADHESIVE, GROUT and RATES blocks of the script):
+    Adhesive  by surface (floor / walls) and what they're tiling onto; white adhesive for light
+              ceramic wall tiles, grey otherwise (switchable). 20kg bag coverage:
+              large format (60x120+) 3.5 m², medium floor 4.5 / wall 5, small floor 5.5 / wall 6.5,
+              15% less over underfloor heating or timber.
+    Grout     Mapei Ultracolor Plus 5kg. Colour pre-picked from the tile colour. Quantity from the
+              tile size, thickness and joint (2mm rectified, 3mm otherwise):
+              kg per m² = (L+W)/(L*W) x joint x thickness x 1.6, plus 25%.
+    Extras    levelling clips (tiles 600mm+), spacers (smaller tiles) and primer (plaster, timber,
+              existing tiles) show automatically once products with "levelling clip", "spacer" or
+              "primer" in the title are live in the tiling-tools-accessories collection.
+              Backer board over timber floors, levelling compound for uneven floors (optional).
+  Products come from the adhesive, grout, backerboards, adhesive-grout and
+  tiling-tools-accessories collections; anything out of stock is skipped automatically.
+  Also works on pallet deals: the m² in the title ("43 sq.m") x the quantity.
+{%- endcomment -%}
+{%- liquid
+  capture tk_pm
+    render 'tp-per-m', product: product
+  endcapture
+  assign tk_pm = tk_pm | strip
+  assign tk_t = product.title | downcase
+  assign tk_ok = false
+  assign tk_pallet = false
+  if tk_pm == 'y'
+    assign tk_ok = true
+  elsif tk_t contains 'pallet' and tk_t contains 'sq'
+    assign tk_ok = true
+    assign tk_pallet = true
+  endif
+  if tk_t contains 'spc' or tk_t contains 'vinyl' or tk_t contains 'laminate' or tk_t contains 'sample' or product.tags contains 'Samples'
+    assign tk_ok = false
+  endif
+  unless product.available
+    assign tk_ok = false
+  endunless
+
+  assign tk_other = 0
+  if tk_ok
+    for li in cart.items
+      if li.product_id == product.id
+        continue
+      endif
+      capture tk_o
+        render 'tp-own-delivery', product: li.product
+      endcapture
+      assign tk_o = tk_o | strip
+      if tk_o == 'n' and li.requires_shipping
+        assign tk_other = tk_other | plus: li.final_line_price
+      endif
+    endfor
+  endif
+-%}
+{%- if tk_ok -%}
+  {%- capture tk_prods -%}
+    {%- assign tk_cols = 'adhesive,grout,backerboards,adhesive-grout,tiling-tools-accessories' | split: ',' -%}
+    {%- for ch in tk_cols -%}
+      {%- assign tk_c = collections[ch] -%}
+      {%- if tk_c == blank -%}{%- continue -%}{%- endif -%}
+      {%- for p in tk_c.products limit: 50 -%}
+        {%- unless p.available -%}{%- continue -%}{%- endunless -%}
+        {%- assign pv = p.selected_or_first_available_variant -%}
+        {"h":{{ p.handle | json }},"t":{{ p.title | json }},"v":{{ pv.id }},"p":{{ pv.price }},"u":{{ p.url | json }},"c":{{ ch | json }},"i":{% if p.featured_image %}{{ p.featured_image | image_url: width: 120 | json }}{% else %}""{% endif %}},
+      {%- endfor -%}
+    {%- endfor -%}
+  {%- endcapture -%}
+  <div class="tp-kit" data-tp-kit data-product-id="{{ product.id }}" hidden>
+    <script type="application/json" data-tk-tile>{
+      "id": {{ product.id }},
+      "title": {{ product.title | json }},
+      "size": {{ product.metafields.custom.size.value | append: '' | json }},
+      "thick": {{ product.metafields.custom.thickness.value | append: '' | json }},
+      "rect": {{ product.metafields.custom.rectified.value | append: '' | json }},
+      "surface": {{ product.metafields.custom.tile_surface.value | append: '' | json }},
+      "fw": {{ product.metafields.custom.floor_or_wall.value | append: '' | json }},
+      "colour": {{ product.metafields.custom.tile_color.value | append: '' | json }},
+      "material": {{ product.metafields.custom.tile_material.value | append: '' | json }},
+      "price": {{ product.selected_or_first_available_variant.price | default: product.price }},
+      "pallet": {{ tk_pallet | json }},
+      "cartOther": {{ tk_other }},
+      "freeFrom": 50000,
+      "saving": 3999
+    }</script>
+    <script type="application/json" data-tk-prods>[{{ tk_prods | strip | remove_last: ',' }}]</script>
+
+    <div class="tp-kit__head">
+      <span class="tp-kit__h">Your tiling kit</span>
+      <span class="tp-kit__sub" data-tk-sub>Enter your area above and we'll work out what you need</span>
+    </div>
+
+    <div class="tp-kit__opts">
+      <label class="tp-kit__opt"><span>Tiling</span>
+        <select data-tk-surface aria-label="Floor or walls">
+          <option value="floor">the floor</option>
+          <option value="wall">walls</option>
+        </select>
+      </label>
+      <label class="tp-kit__opt"><span>onto</span>
+        <select data-tk-base aria-label="What you're tiling onto"></select>
+      </label>
+      <label class="tp-kit__opt"><span>Joints</span>
+        <select data-tk-joint aria-label="Grout joint width">
+          <option value="2">2mm</option>
+          <option value="3">3mm</option>
+          <option value="5">5mm</option>
+        </select>
+      </label>
+      <label class="tp-kit__ufh" data-tk-ufh-wrap><input type="checkbox" data-tk-ufh> Underfloor heating</label>
+    </div>
+
+    <div class="tp-kit__rows" data-tk-rows></div>
+
+    <div class="tp-kit__foot">
+      <div class="tp-kit__sum"><span>Kit total</span><b data-tk-total>£0.00</b></div>
+      <button type="button" class="tp-kit__add" data-tk-add disabled><span class="lbl">Add kit to basket</span></button>
+    </div>
+    <p class="tp-kit__fd" data-tk-fd hidden></p>
+    <p class="tp-kit__done" data-tk-done hidden>Added to your basket. <a href="{{ routes.cart_url }}">View basket</a></p>
+    <p class="tp-kit__small">Quantities are a guide for a flat, prepared surface; you can change them before adding.</p>
+  </div>
+
+  <style>
+    .tp-kit{margin:16px 0 0;font-family:"Open Sans",sans-serif;border:1.5px solid #e6e8eb;border-radius:12px;padding:14px;background:#fff;}
+    .tp-kit__head{display:flex;flex-direction:column;gap:2px;margin-bottom:10px;}
+    .tp-kit__h{font-size:14px;font-weight:800;color:#1a1d24;}
+    .tp-kit__sub{font-size:12.5px;color:#6b7280;}
+    .tp-kit__opts{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:12px;padding:10px;background:#f7f8f9;border-radius:10px;}
+    .tp-kit__opt{display:flex;align-items:center;gap:6px;margin:0;font-size:12.5px;font-weight:600;color:#1a1d24;}
+    .tp-kit__opt select{height:34px;padding:0 26px 0 8px;border:1.5px solid #dfe3e7;border-radius:8px;background:#fff;font-size:13px;font-weight:600;color:#1a1d24;max-width:210px;}
+    .tp-kit__ufh{display:flex;align-items:center;gap:6px;margin:0;font-size:12.5px;font-weight:600;color:#1a1d24;cursor:pointer;}
+    .tp-kit__ufh input{width:16px;height:16px;margin:0;accent-color:#1f8a4c;}
+    .tp-kit__rows{display:flex;flex-direction:column;gap:8px;}
+    .tp-kit__row{display:grid;grid-template-columns:22px 44px 1fr auto;gap:8px 10px;align-items:center;border:1px solid #e6e8eb;border-radius:10px;padding:8px 10px;}
+    .tp-kit__row.is-off{opacity:.55;}
+    .tp-kit__row input[type=checkbox]{width:18px;height:18px;margin:0;accent-color:#1f8a4c;cursor:pointer;}
+    .tp-kit__img{width:44px;height:44px;border-radius:6px;object-fit:cover;background:#f4f4f4;display:block;}
+    .tp-kit__txt{min-width:0;display:flex;flex-direction:column;gap:1px;}
+    .tp-kit__role{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#1f8a4c;}
+    .tp-kit__t{font-size:12.5px;font-weight:600;color:#1a1d24;line-height:1.3;text-decoration:none;}
+    .tp-kit__t:hover{text-decoration:underline;}
+    .tp-kit__why{font-size:11.5px;color:#6b7280;line-height:1.35;}
+    .tp-kit__why button{background:none;border:0;padding:0;color:#016FD0;font-size:11.5px;font-weight:600;cursor:pointer;text-decoration:underline;}
+    .tp-kit__right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+    .tp-kit__qty{display:flex;align-items:center;border:1.5px solid #e6e8eb;border-radius:8px;overflow:hidden;}
+    .tp-kit__qty button{width:26px;height:28px;border:0;background:#fff;font-size:16px;line-height:1;cursor:pointer;color:#1a1d24;}
+    .tp-kit__qty span{min-width:26px;text-align:center;font-size:13px;font-weight:800;}
+    .tp-kit__price{font-size:13px;font-weight:800;color:#1a1d24;white-space:nowrap;}
+    .tp-kit__sw{grid-column:3 / 5;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+    .tp-kit__sw button{width:24px;height:24px;border-radius:50%;border:1.5px solid #cfd4d9;padding:0;cursor:pointer;}
+    .tp-kit__sw button.is-on{box-shadow:0 0 0 2px #fff,0 0 0 4px #1a1d24;}
+    .tp-kit__sw em{font-style:normal;font-size:12px;font-weight:600;color:#1a1d24;margin-left:4px;}
+    .tp-kit__foot{display:flex;align-items:center;gap:12px;margin-top:12px;}
+    .tp-kit__sum{display:flex;flex-direction:column;}
+    .tp-kit__sum span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;}
+    .tp-kit__sum b{font-size:19px;font-weight:800;color:#1a1d24;}
+    .tp-kit__add{flex:1 1 auto;background:#1f8a4c;border:0;color:#fff;border-radius:10px;padding:12px 14px;font-size:14px;font-weight:800;cursor:pointer;}
+    .tp-kit__add:hover{background:#18703d;}
+    .tp-kit__add[disabled]{background:#9ec9ae;cursor:not-allowed;}
+    .tp-kit__fd{margin:10px 0 0;font-size:12.5px;font-weight:600;color:#1a1d24;background:#f7f8f9;border-radius:8px;padding:8px 10px;}
+    .tp-kit__fd b{color:#c8102e;}
+    .tp-kit__fd.is-free b{color:#1f8a4c;}
+    .tp-kit__done{margin:10px 0 0;font-size:13px;font-weight:600;color:#1f8a4c;}
+    .tp-kit__done a{color:#1a1d24;text-decoration:underline;}
+    .tp-kit__small{margin:8px 0 0;font-size:11px;color:#8a9199;}
+    @media (max-width:420px){.tp-kit__row{grid-template-columns:20px 40px 1fr;}.tp-kit__right{grid-column:2 / 4;flex-direction:row;justify-content:space-between;align-items:center;}.tp-kit__sw{grid-column:1 / 4;}}
+  </style>
+
+  <script>
+  (function(){
+    var box = document.querySelector('[data-tp-kit][data-product-id="{{ product.id }}"]');
+    if(!box || box.__tk){ return; }
+    box.__tk = true;
+    var tile, all;
+    try {
+      tile = JSON.parse(box.querySelector('[data-tk-tile]').textContent);
+      all = JSON.parse(box.querySelector('[data-tk-prods]').textContent);
+    } catch(e){ return; }
+    var P = {};
+    all.forEach(function(p){ if(!P[p.h]){ P[p.h] = p; } });
+    function has(h){ return !!P[h]; }
+    function first(list){ for(var i = 0; i < list.length; i++){ if(has(list[i])){ return P[list[i]]; } } return null; }
+    function byWord(words, col){
+      for(var i = 0; i < all.length; i++){
+        var t = all[i].t.toLowerCase();
+        if(col && all[i].c !== col){ continue; }
+        for(var j = 0; j < words.length; j++){ if(t.indexOf(words[j]) > -1){ return all[i]; } }
+      }
+      return null;
+    }
+    function money(p){ return '£' + (p / 100).toFixed(2); }
+
+    /* ---------- ADHESIVE: best first; out-of-stock ones are skipped ---------- */
+    var ADH = {
+      grey: {
+        floor_screed: ['mapei-keraquick-grey-rapid-setting-adhesive-20kg', 'ultra-tile-fix-proflex-sp-rapid-set-grey-adhesive-20kg', 'ultra-tile-fix-progrip-fx-fibre-semi-rapid-set-grey-adhesive-20kg'],
+        floor_ufh: ['mapei-mapeker-rapid-set-flex-grey-tile-adhesive-20kg', 'ultra-tile-proflex-s2-flexible-fibre-reinforced-tile-adhesive-grey-20kg', 'mapei-keraquick-grey-rapid-setting-adhesive-20kg'],
+        floor_timber: ['ultra-tile-proflex-s2-flexible-fibre-reinforced-tile-adhesive-grey-20kg', 'mapei-mapeker-rapid-set-flex-grey-tile-adhesive-20kg', 'ultra-tile-fix-proflex-sp-rapid-set-grey-adhesive-20kg'],
+        tiles: ['ultra-tile-fix-proflex-sp-rapid-set-grey-adhesive-20kg', 'ultra-tile-fix-proflex-spes-grey-adhesive-20kg', 'mapei-keraquick-grey-rapid-setting-adhesive-20kg'],
+        wall: ['mapei-keraflex-maxi-s1-grey-adhesive-20kg', 'mapei-keraquick-grey-rapid-setting-adhesive-20kg', 'ultra-tile-fix-progrip-fx-fibre-semi-rapid-set-grey-adhesive-20kg']
+      },
+      white: {
+        floor_screed: ['mapei-keraquick-white-rapid-setting-adhesive-20kg', 'ultra-tile-fix-proflex-sp-rapid-set-white-adhesive-20kg'],
+        floor_ufh: ['mapei-keraquick-white-rapid-setting-adhesive-20kg', 'ultra-tile-fix-proflex-sp-rapid-set-white-adhesive-20kg'],
+        floor_timber: ['ultra-tile-fix-proflex-sp-rapid-set-white-adhesive-20kg', 'mapei-keraquick-white-rapid-setting-adhesive-20kg'],
+        tiles: ['ultra-tile-fix-proflex-sp-rapid-set-white-adhesive-20kg', 'ultra-tile-fix-proflex-spes-white-adhesive-20kg'],
+        wall: ['mapei-keraflex-maxi-s1-white-adhesive-20kg', 'ultra-tile-fix-progrip-fx-fibre-semi-rapid-set-white-adhesive-20kg', 'mapei-keraquick-white-rapid-setting-adhesive-20kg']
+      }
+    };
+    /* ---------- GROUT: Mapei Ultracolor Plus 5kg ---------- */
+    var GROUT = [
+      { n: 'White', x: '#f3f3f0', h: 'mapei-ultracolor-plus-100-white-tile-grout-5kg' },
+      { n: 'Manhattan Grey', x: '#c4c3bd', h: 'mapei-ultracolor-plus-110-manhattan-grey-tile-grout-5kg' },
+      { n: 'Silver Grey', x: '#a7a9aa', h: 'copy-of-mapei-ultracolor-plus-111-silver-grey-tile-grout-5kg' },
+      { n: 'Medium Grey', x: '#8b8c8a', h: 'mapei-ultracolor-plus-112-medium-grey-tile-grout-5kg' },
+      { n: 'Cement Grey', x: '#77787a', h: 'mapei-ultracolor-plus-113-cement-grey-tile-grout-5kg' },
+      { n: 'Anthracite', x: '#46494c', h: 'mapei-ultracolor-plus-114-anthracite-tile-grout-5-kg' },
+      { n: 'Black', x: '#1d1d1d', h: 'mapei-ultracolor-plus-120-black-tile-grout-5kg' },
+      { n: 'Beige', x: '#d8c9a9', h: 'mapei-ultracolor-plus-132-beige-tile-grout-5kg' }
+    ].filter(function(g){ return has(g.h); });
+    var GROUT_BAG_KG = 5;
+    /* ---------- RATES ---------- */
+    var BOARD_M2 = 0.96, XPS_M2 = 0.72, LEVEL_M2 = 4.4, PRIMER_M2_PER_L = 15;
+
+    /* ---------- tile facts ---------- */
+    function dims(){
+      var s = (tile.size || '') + ' ' + (tile.title || '');
+      var m = s.match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(mm|cm)/i);
+      if(!m){ return [600, 600]; }
+      var k = m[3].toLowerCase() === 'cm' ? 10 : 1;
+      var a = parseFloat(m[1]) * k, b = parseFloat(m[2]) * k;
+      return [Math.max(a, b), Math.min(a, b)];
+    }
+    var D = dims(), L = D[0], W = D[1];
+    var thick = parseFloat(tile.thick) || (L >= 600 ? 9 : 8);
+    var tileM2 = (L * W) / 1e6;
+    var fmt = (L >= 1000 || tileM2 >= 0.5) ? 'large' : (L >= 450 ? 'medium' : 'small');
+    var colour = (tile.colour || '').toLowerCase();
+    var firstCol = colour.split(/[,\/&]/)[0].trim();
+    var ceramic = (tile.material || '').toLowerCase().indexOf('ceramic') > -1;
+    var wallOnly = /^wall$/i.test((tile.surface || '').trim()) || /^wall$/i.test((tile.fw || '').trim());
+    var palletM2 = 0;
+    if(tile.pallet){ var pm = (tile.title || '').match(/(\d+(?:\.\d+)?)\s*sq\.?\s*m/i); palletM2 = pm ? parseFloat(pm[1]) : 0; }
+    if(tile.pallet && !palletM2){ return; }
+
+    function defaultGrout(){
+      var map = { black: 'Black', anthracite: 'Anthracite', charcoal: 'Anthracite', grey: 'Silver Grey', gray: 'Silver Grey', silver: 'Silver Grey',
+        beige: 'Beige', cream: 'Beige', brown: 'Beige', taupe: 'Beige', terracotta: 'Beige', ivory: 'White', white: 'White', gold: 'White',
+        blue: 'White', green: 'White', pink: 'White', purple: 'White', yellow: 'White' };
+      var want = map[firstCol] || 'Silver Grey';
+      for(var i = 0; i < GROUT.length; i++){ if(GROUT[i].n === want){ return i; } }
+      return GROUT.length ? 0 : -1;
+    }
+
+    /* ---------- controls ---------- */
+    var selSurface = box.querySelector('[data-tk-surface]');
+    var selBase = box.querySelector('[data-tk-base]');
+    var selJoint = box.querySelector('[data-tk-joint]');
+    var ufh = box.querySelector('[data-tk-ufh]');
+    var ufhWrap = box.querySelector('[data-tk-ufh-wrap]');
+    var rowsEl = box.querySelector('[data-tk-rows]');
+    var totalEl = box.querySelector('[data-tk-total]');
+    var addBtn = box.querySelector('[data-tk-add]');
+    var addLbl = addBtn.querySelector('.lbl');
+    var subEl = box.querySelector('[data-tk-sub]');
+    var fdEl = box.querySelector('[data-tk-fd]');
+    var doneEl = box.querySelector('[data-tk-done]');
+    var BASES = {
+      floor: [['screed', 'concrete or screed'], ['timber', 'floorboards or ply'], ['tiles', 'existing tiles'], ['board', 'tile backer board']],
+      wall: [['plaster', 'plaster or plasterboard'], ['board', 'tile backer board'], ['tiles', 'existing tiles']]
+    };
+    function fillBases(){
+      var list = BASES[selSurface.value];
+      selBase.innerHTML = list.map(function(b){ return '<option value="' + b[0] + '">' + b[1] + '</option>'; }).join('');
+      ufhWrap.style.display = selSurface.value === 'floor' ? '' : 'none';
+    }
+    selSurface.value = (wallOnly || (ceramic && fmt === 'small')) ? 'wall' : 'floor';
+    selJoint.value = /^y/i.test(tile.rect || '') ? '2' : '3';
+    fillBases();
+
+    var state = { grout: defaultGrout(), white: null, off: {}, qty: {} };
+
+    /* ---------- area from the tile calculator ---------- */
+    var calc = document.getElementById('tpq-' + tile.id);
+    var sqmIn = calc ? calc.querySelector('[data-role="sqm"]') : null;
+    var chargeIn = document.getElementById('tpq-qty-' + tile.id);
+    var form = box.closest('form') || document.querySelector('form[action*="/cart/add"]');
+    var qtyIn = form ? form.querySelector('[name="quantity"]') : null;
+    function area(){
+      if(tile.pallet){ var q = qtyIn ? (parseInt(qtyIn.value, 10) || 1) : 1; return palletM2 * q; }
+      var a = sqmIn ? parseFloat(sqmIn.value) : 0;
+      return a > 0 ? a : 0;
+    }
+    function tilesTotal(){
+      if(tile.pallet){ var q = qtyIn ? (parseInt(qtyIn.value, 10) || 1) : 1; return q * tile.price; }
+      var c = chargeIn ? (parseInt(chargeIn.value, 10) || 0) : 0;
+      return area() > 0 ? c * tile.price : 0;
+    }
+
+    /* ---------- build the list ---------- */
+    function lines(){
+      var a = area(), out = [];
+      if(a <= 0){ return out; }
+      var surf = selSurface.value, base = selBase.value, heated = surf === 'floor' && ufh.checked;
+      var key = surf === 'wall' ? (base === 'tiles' ? 'tiles' : 'wall') : (base === 'tiles' ? 'tiles' : (base === 'timber' ? 'floor_timber' : (heated ? 'floor_ufh' : 'floor_screed')));
+      var light = ['white', 'cream', 'ivory', 'beige', 'pink', 'yellow', 'green', 'blue'].indexOf(firstCol) > -1;
+      var white = state.white === null ? (surf === 'wall' && ceramic && light) : state.white;
+      var adh = first(ADH[white ? 'white' : 'grey'][key]) || first(ADH[white ? 'grey' : 'white'][key]);
+      if(adh){
+        var rate = fmt === 'large' ? 3.5 : (fmt === 'medium' ? (surf === 'wall' ? 5 : 4.5) : (surf === 'wall' ? 6.5 : 5.5));
+        if(heated || base === 'timber'){ rate = rate * 0.85; }
+        out.push({ k: 'adh', role: 'Adhesive', p: adh, q: Math.ceil(a / rate), on: true,
+          why: (white ? 'White' : 'Grey') + ' adhesive, about ' + rate.toFixed(1) + ' m² per 20kg bag. <button type="button" data-tk-white>Use ' + (white ? 'grey' : 'white') + ' instead</button>' });
+      }
+      if(state.grout > -1){
+        var g = GROUT[state.grout];
+        var joint = parseFloat(selJoint.value) || 2;
+        var kg = ((L + W) / (L * W)) * joint * thick * 1.6 * a * 1.25;
+        out.push({ k: 'grout', role: 'Grout', p: P[g.h], q: Math.max(1, Math.ceil(kg / GROUT_BAG_KG)), on: true, swatch: true,
+          why: 'About ' + Math.max(0.5, Math.round(kg * 2) / 2) + 'kg for ' + joint + 'mm joints' });
+      }
+      var tileCount = a / tileM2;
+      if(L >= 600){
+        var clip = byWord(['levelling clip', 'leveling clip'], 'tiling-tools-accessories');
+        if(clip){
+          var pk = packSize(clip.t, 100), per = L >= 1000 ? 6 : 4;
+          out.push({ k: 'clips', role: 'Levelling clips', p: clip, q: Math.max(1, Math.ceil(tileCount * per / pk)), on: fmt === 'large',
+            why: 'About ' + Math.ceil(tileCount * per) + ' clips keep big tiles flat and lippage-free' });
+        }
+      } else {
+        var sp = byWord(['spacer'], 'tiling-tools-accessories');
+        if(sp){
+          var ps = packSize(sp.t, 250);
+          out.push({ k: 'spacers', role: 'Spacers', p: sp, q: Math.max(1, Math.ceil(tileCount * 2 / ps)), on: true, why: 'Keeps your joints even' });
+        }
+      }
+      if(base === 'plaster' || base === 'timber' || base === 'tiles'){
+        var pr = byWord(['primer'], 'tiling-tools-accessories');
+        if(pr){
+          var lit = packSize(pr.t, 1, /(\d+(?:\.\d+)?)\s*(l|ltr|litre|liter)s?\b/i);
+          out.push({ k: 'primer', role: 'Primer', p: pr, q: Math.max(1, Math.ceil(a / PRIMER_M2_PER_L / lit)), on: true,
+            why: base === 'plaster' ? 'Seals plaster so the adhesive grips' : (base === 'timber' ? 'Primes timber before tiling' : 'Helps adhesive bond to old tiles') });
+        }
+      }
+      if(surf === 'floor' && base === 'timber'){
+        var bd = first(['6mm-cement-tile-backer-board-800-1200mm', 'hardiebacker-backerboard-6mm', '10mm-cement-tile-backer-board-800-1200mm']);
+        if(bd){ out.push({ k: 'board', role: 'Backer board', p: bd, q: Math.ceil(a / BOARD_M2 * 1.05), on: true, why: 'Overboard floorboards first so tiles don’t crack' }); }
+      }
+      if(heated){
+        var xps = first(['6mm-xps-pro-insulation-tile-backer-board-600x1200mm', '10mm-xps-pro-insulation-tile-backer-board-600x1200mm']);
+        if(xps){ out.push({ k: 'xps', role: 'Optional: insulation board', p: xps, q: Math.ceil(a / XPS_M2 * 1.05), on: false, why: 'Goes under electric underfloor heating so the heat goes up, not down' }); }
+      }
+      if(surf === 'floor' && base === 'screed'){
+        var lv = first(['britlevel-flexible-grey-levelling-compound-20kg']) || byWord(['levelling compound', 'self level']);
+        if(lv){ out.push({ k: 'level', role: 'Optional: levelling compound', p: lv, q: Math.ceil(a / LEVEL_M2), on: false, why: 'Only if your floor is uneven: about ' + LEVEL_M2 + ' m² per 20kg bag at 3mm' }); }
+      }
+      return out;
+    }
+    function packSize(title, dflt, re){
+      var m = (title || '').match(re || /(?:pack of|x|bag of)?\s*(\d{2,4})\s*(?:pcs|pieces|pack|pk|clips|spacers)?\b/i);
+      var n = m ? parseFloat(m[1]) : 0;
+      return n > 0 ? n : dflt;
+    }
+
+    var current = [];
+    function render(){
+      var a = area();
+      current = lines();
+      if(a <= 0 || !current.length){
+        box.hidden = !current.length && a > 0;
+        if(a <= 0){ box.hidden = false; }
+        rowsEl.innerHTML = '';
+        subEl.textContent = 'Enter your area above and we’ll work out what you need';
+        totalEl.textContent = '£0.00';
+        addBtn.disabled = true;
+        addLbl.textContent = 'Add kit to basket';
+        fdEl.hidden = true;
+        return;
+      }
+      box.hidden = false;
+      subEl.textContent = 'Worked out for ' + (Math.round(a * 10) / 10) + ' m² of ' + (Math.round(W) / 10) + 'x' + (Math.round(L) / 10) + 'cm tiles';
+      rowsEl.innerHTML = current.map(function(r, i){
+        var q = state.qty[r.k] !== undefined ? state.qty[r.k] : r.q;
+        var on = state.off[r.k] !== undefined ? !state.off[r.k] : r.on;
+        r.q2 = q; r.on2 = on;
+        var sw = '';
+        if(r.swatch){
+          sw = '<div class="tp-kit__sw">' + GROUT.map(function(g, gi){
+            return '<button type="button" data-tk-g="' + gi + '" class="' + (gi === state.grout ? 'is-on' : '') + '" style="background:' + g.x + '" title="' + g.n + '" aria-label="Grout colour ' + g.n + '"></button>';
+          }).join('') + '<em>' + GROUT[state.grout].n + '</em></div>';
+        }
+        return '<div class="tp-kit__row' + (on ? '' : ' is-off') + '" data-i="' + i + '">' +
+          '<input type="checkbox" data-tk-on ' + (on ? 'checked' : '') + ' aria-label="Include ' + r.role + '">' +
+          (r.p.i ? '<img class="tp-kit__img" src="' + r.p.i + '" alt="" loading="lazy">' : '<span class="tp-kit__img"></span>') +
+          '<span class="tp-kit__txt"><span class="tp-kit__role">' + r.role + '</span><a class="tp-kit__t" href="' + r.p.u + '">' + r.p.t.replace(/</g, '&lt;') + '</a><span class="tp-kit__why">' + (r.why || '') + '</span></span>' +
+          '<span class="tp-kit__right"><span class="tp-kit__qty"><button type="button" data-tk-q="-1" aria-label="Fewer">&minus;</button><span>' + q + '</span><button type="button" data-tk-q="1" aria-label="More">+</button></span>' +
+          '<span class="tp-kit__price">' + money(r.p.p * q) + '</span></span>' + sw + '</div>';
+      }).join('');
+      var sum = 0, n = 0;
+      current.forEach(function(r){ if(r.on2 && r.q2 > 0){ sum += r.p.p * r.q2; n++; } });
+      totalEl.textContent = money(sum);
+      addBtn.disabled = n === 0;
+      addLbl.textContent = n === 0 ? 'Tick what you need' : 'Add ' + (n === 1 ? '1 item' : n + ' items') + ' to basket';
+      var basket = (tile.cartOther || 0) + tilesTotal() + sum;
+      var left = tile.freeFrom - basket;
+      fdEl.hidden = tilesTotal() <= 0;
+      fdEl.classList.toggle('is-free', left <= 0);
+      fdEl.innerHTML = left <= 0 ? 'Tiles and kit together get <b>free delivery</b> (saves ' + money(tile.saving) + ').' : 'Tiles and kit together: <b>' + money(left) + '</b> away from free delivery.';
+    }
+
+    rowsEl.addEventListener('click', function(e){
+      var row = e.target.closest('.tp-kit__row'); if(!row){ return; }
+      var r = current[parseInt(row.getAttribute('data-i'), 10)]; if(!r){ return; }
+      var qb = e.target.closest('[data-tk-q]');
+      if(qb){ var nq = Math.max(0, r.q2 + parseInt(qb.getAttribute('data-tk-q'), 10)); state.qty[r.k] = nq; if(nq > 0){ state.off[r.k] = false; } render(); return; }
+      var gb = e.target.closest('[data-tk-g]');
+      if(gb){ state.grout = parseInt(gb.getAttribute('data-tk-g'), 10); render(); return; }
+      if(e.target.closest('[data-tk-white]')){ var cur = current.filter(function(x){ return x.k === 'adh'; })[0]; state.white = cur ? cur.why.indexOf('White') !== 0 : true; render(); return; }
+    });
+    rowsEl.addEventListener('change', function(e){
+      if(!e.target.matches('[data-tk-on]')){ return; }
+      var row = e.target.closest('.tp-kit__row');
+      var r = current[parseInt(row.getAttribute('data-i'), 10)];
+      if(r){ state.off[r.k] = !e.target.checked; render(); }
+    });
+    function reset(){ state.qty = {}; render(); }
+    selSurface.addEventListener('change', function(){ fillBases(); state.white = null; reset(); });
+    selBase.addEventListener('change', reset);
+    selJoint.addEventListener('change', reset);
+    ufh.addEventListener('change', reset);
+    if(sqmIn){ sqmIn.addEventListener('input', reset); }
+    if(calc){ calc.addEventListener('click', function(){ setTimeout(reset, 0); }); calc.addEventListener('change', reset); }
+    if(qtyIn){ qtyIn.addEventListener('change', reset); qtyIn.addEventListener('input', reset); }
+
+    addBtn.addEventListener('click', function(){
+      var items = [];
+      current.forEach(function(r){ if(r.on2 && r.q2 > 0){ items.push({ id: r.p.v, quantity: r.q2, properties: { '_cross_sell_source': 'tiling_kit' } }); } });
+      if(!items.length){ return; }
+      addBtn.disabled = true;
+      addLbl.textContent = 'Adding…';
+      fetch('/cart/add.js', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: items }) })
+        .then(function(r){ if(!r.ok){ throw new Error('add failed'); } return r.json(); })
+        .then(function(){
+          document.documentElement.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
+          doneEl.hidden = false;
+          addBtn.disabled = false;
+          addLbl.textContent = 'Added. Add again?';
+        })
+        .catch(function(){
+          addBtn.disabled = false;
+          addLbl.textContent = 'Add kit to basket';
+          alert('Sorry, the kit could not be added. Please try again.');
+        });
+    });
+    render();
+  })();
+  </script>
+{%- endif -%}

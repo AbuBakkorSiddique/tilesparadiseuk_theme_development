@@ -1,0 +1,93 @@
+{%- comment -%}
+  The Vitals "related products" widget uses one heading for every page:
+  "Not quite the right look? Browse similar tiles". On bathroom pages this swaps
+  "tiles" for the right word (taps, showers, toilets, mirrors, radiators...).
+  Tile pages are left alone. Rendered from product-meta.
+{%- endcomment -%}
+{%- liquid
+  assign tpsh_type = product.type | downcase
+  assign tpsh_sfx = template.suffix | default: product.template_suffix | default: ''
+  assign tpsh_noun = ''
+  if tpsh_type contains 'boiling'
+    assign tpsh_noun = 'boiling taps'
+  elsif tpsh_type contains 'kitchen'
+    assign tpsh_noun = 'kitchen taps'
+  elsif tpsh_type contains 'tap' or tpsh_type contains 'mixer'
+    assign tpsh_noun = 'taps'
+  elsif tpsh_type contains 'shower'
+    assign tpsh_noun = 'showers'
+  elsif tpsh_type contains 'toilet'
+    assign tpsh_noun = 'toilets'
+  elsif tpsh_type contains 'towel'
+    assign tpsh_noun = 'towel rails'
+  elsif tpsh_type contains 'valve'
+    assign tpsh_noun = 'valves'
+  elsif tpsh_type contains 'radiator accessor'
+    assign tpsh_noun = 'radiator accessories'
+  elsif tpsh_type contains 'radiator'
+    assign tpsh_noun = 'radiators'
+  elsif tpsh_type contains 'waste'
+    assign tpsh_noun = 'wastes'
+  elsif tpsh_type contains 'accessor'
+    assign tpsh_noun = 'accessories'
+  elsif tpsh_type contains 'basin'
+    assign tpsh_noun = 'basins'
+  elsif tpsh_type contains 'suite'
+    assign tpsh_noun = 'bathroom suites'
+  endif
+  if tpsh_noun == ''
+    case tpsh_sfx
+      when 'taps'
+        assign tpsh_noun = 'taps'
+      when 'kitchen-taps'
+        assign tpsh_noun = 'kitchen taps'
+      when 'boiling-taps'
+        assign tpsh_noun = 'boiling taps'
+      when 'shower'
+        assign tpsh_noun = 'showers'
+      when 'toilets'
+        assign tpsh_noun = 'toilets'
+      when 'mirrors-v2'
+        assign tpsh_noun = 'mirrors'
+      when 'radiator-v3'
+        assign tpsh_noun = 'radiators'
+      when 'towel-rails'
+        assign tpsh_noun = 'towel rails'
+      when 'radiator-valves'
+        assign tpsh_noun = 'valves'
+      when 'wastes'
+        assign tpsh_noun = 'wastes'
+      when 'bath-accessories'
+        assign tpsh_noun = 'accessories'
+    endcase
+  endif
+-%}
+{%- if tpsh_noun != '' -%}
+<script>
+(function(){
+  if (window.__tpSimilarHeading) { return; }
+  window.__tpSimilarHeading = true;
+  var noun = {{ tpsh_noun | json }};
+  var hit = /similar tiles/i, rep = /similar tiles/gi;
+  function swap(m){
+    var n = m.charAt(8) === 'T' ? noun.replace(/\b\w/g, function(c){ return c.toUpperCase(); }) : noun;
+    return (m.charAt(0) === 'S' ? 'Similar ' : 'similar ') + n;
+  }
+  function scan(root){
+    if (!root) { return; }
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null), node, found = [];
+    while ((node = walker.nextNode())) { if (hit.test(node.nodeValue)) { found.push(node); } }
+    for (var i = 0; i < found.length; i++) { found[i].nodeValue = found[i].nodeValue.replace(rep, swap); }
+  }
+  function run(){
+    scan(document.body);
+    var hosts = document.querySelectorAll('[class*="vtl"],[class*="vitals"],[id*="vitals"]');
+    for (var i = 0; i < hosts.length; i++) { if (hosts[i].shadowRoot) { scan(hosts[i].shadowRoot); } }
+  }
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', run); } else { run(); }
+  var timer, observer = new MutationObserver(function(){ clearTimeout(timer); timer = setTimeout(run, 150); });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  setTimeout(function(){ observer.disconnect(); run(); }, 20000);
+})();
+</script>
+{%- endif -%}
