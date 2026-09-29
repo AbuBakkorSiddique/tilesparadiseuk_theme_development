@@ -5,20 +5,48 @@
         <div class="footer__block-list">
           {%- for block in section.blocks -%}
             {%- case block.type -%}
+              {% when 'logo' %}
+              <div class="footer__block-item footer__block-item--logo" {{ block.shopify_attributes }}>
+                
+                {% if block.settings.logo %}
+                  <img
+                    src="{{ block.settings.logo | image_url: width: 300 }}"
+                    alt="Logo"
+                    style="max-width: {{ block.settings.logo_width }}px;"
+                    class="footer-logo"
+                    width="{{ block.settings.logo_width }}"
+                    height="{{ block.settings.logo_width | divided_by: block.settings.logo.aspect_ratio | round }}"
+                    loading="lazy"
+                  >
+                {% endif %}
+
+              </div>
               {%- when 'text' -%}
                 <div class="footer__block-item footer__block-item--text" {{ block.shopify_attributes }}>
-                  <button class="footer__title heading h6" disabled aria-expanded="false" aria-controls="block-{{ block.id }}" data-action="toggle-collapsible">
+
+                  {% if block.settings.logo %}
+                    <div class="footer-logo-wrapper">
+                      <img
+                        src="{{ block.settings.logo | image_url: width: 200 }}"
+                        alt="Logo"
+                        class="footer-logo"
+                        width="200"
+                        height="{{ 200 | divided_by: block.settings.logo.aspect_ratio | round }}"
+                        loading="lazy"
+                      >
+                    </div>
+                  {% endif %}
+
+                  <button class="footer__title heading h6" disabled>
                     <span>{{ block.settings.title | escape }}</span>
-                    <span class="plus-button"></span>
                   </button>
 
-                  <div id="block-{{ block.id }}" class="footer__collapsible">
-                    <div class="footer__collapsible-content">
-                      <div class="rte">
-                        {{ block.settings.content }}
-                      </div>
+                  <div class="footer__collapsible-content">
+                    <div class="rte">
+                      {{ block.settings.content }}
                     </div>
                   </div>
+
                 </div>
 
               {%- when 'links' -%}
@@ -37,14 +65,50 @@
                           {%- for link in menu.links -%}
                             <li>
                               <a href="{{ link.url }}" class="footer__link-item link">{{ link.title }}</a>
+                              
                             </li>
                           {%- endfor -%}
+                          
                         </ul>
                       </div>
                     </div>
                   </div>
                 {%- endunless -%}
 
+                {% when 'newsletter_custom' %}
+                  <div class="footer__block-item footer__block-item--newsletter" {{ block.shopify_attributes }}>
+
+                    <p class="footer__title heading h6">
+                      {{ block.settings.heading }}
+                    </p>
+
+                    {% if block.settings.subtext != blank %}
+                      <div class="footer__newsletter-text">
+                        {{ block.settings.subtext }}
+                      </div>
+                    {% endif %}
+
+                    {% form 'customer', class: 'footer__newsletter-form custom-newsletter-form' %}
+                      <input type="hidden" name="contact[tags]" value="newsletter">
+
+                      <div class="custom-input-wrapper">
+                        
+                        <input 
+                          type="email" 
+                          name="contact[email]" 
+                          placeholder="Email" 
+                          required
+                          class="custom-newsletter-input"
+                        >
+
+                        <button type="submit" class="custom-submit-btn">
+                          →
+                        </button>
+
+                      </div>
+                    {% endform %}
+
+                  </div>
               {%- when 'newsletter' -%}
                 <div class="footer__block-item footer__block-item--newsletter" {{ block.shopify_attributes }}>
                   <p class="footer__title heading h6">{{ block.settings.title | escape }}</p>
@@ -137,7 +201,7 @@
                       {%- render 'icon', icon: 'arrow-bottom' -%}
                     </button>
 
-                    <div id="footer-currency-picker" class="value-picker value-picker--align-left value-picker--auto value-picker--small" data-picker-position="top" aria-hidden="true">
+                    <div id="footer-currency-picker" class="value-picker value-picker--auto value-picker--small" data-picker-position="top" aria-hidden="true">
                       {% render 'icon', icon: 'nav-triangle-borderless' %}
 
                       <div class="value-picker__inner value-picker__inner--restrict">
@@ -163,7 +227,7 @@
             {%- endform -%}
           {%- endif -%}
 
-          {%- capture copyright_info -%}© {{ 'now' | date: '%Y' }} {{ shop.name }}{%- if section.settings.show_powered_by_shopify -%}<br>{{ powered_by_link }}{%- endif -%}{%- endcapture -%}
+          {%- capture copyright_info -%}© {{ 'now' | date: '%Y' }} {{ shop.name }}<br>{%- endcapture -%}
           <p class="hidden-pocket">{{ copyright_info }}</p>
         </div>
 
@@ -261,6 +325,26 @@
   ],
   "blocks": [
     {
+      "type": "logo",
+      "name": "Logo",
+      "settings": [
+        {
+          "type": "image_picker",
+          "id": "logo",
+          "label": "Logo"
+        },
+        {
+          "type": "range",
+          "id": "logo_width",
+          "label": "Logo Width",
+          "min": 80,
+          "max": 250,
+          "step": 10,
+          "default": 150
+        }
+      ]
+    },
+    {
       "type": "text",
       "name": "Text",
       "settings": [
@@ -275,6 +359,11 @@
           "id": "content",
           "label": "Content",
           "default": "<p>Use this text area to tell your customers about your brand and vision. You can change it in the theme editor.</p>"
+        },
+        {
+          "type": "image_picker",
+          "id": "logo",
+          "label": "Logo (optional)"
         }
       ]
     },
@@ -312,6 +401,23 @@
           "default": "<p>A short sentence describing what someone will receive by subscribing</p>"
         }
       ]
+    },
+    {
+      "type": "newsletter_custom",
+      "name": "Custom Newsletter",
+      "settings": [
+        {
+          "type": "text",
+          "id": "heading",
+          "label": "Heading",
+          "default": "Lets Stay in Touch"
+        },
+        {
+          "type": "textarea",
+          "id": "subtext",
+          "label": "Sub Text"
+        }
+      ]
     }
   ],
   "default": {
@@ -334,3 +440,153 @@
   }
 }
 {% endschema %}
+<style>
+/* Custom Newsletter Fix */
+.custom-newsletter-form {
+  margin-top: 15px;
+}
+
+.custom-input-wrapper {
+  position: relative;
+  border-bottom: 1px solid rgba(255,255,255,0.4);
+  display: flex;
+  align-items: center;
+}
+
+.custom-newsletter-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 10px 30px 10px 0;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+
+.custom-newsletter-input::placeholder {
+  color: rgba(255,255,255,0.6);
+}
+
+/* Arrow button */
+.custom-submit-btn {
+  position: absolute;
+  right: 0;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Hover effect */
+.custom-submit-btn:hover {
+  opacity: 0.7;
+}
+.footer__block-item--logo {
+  margin-bottom: 15px;
+}
+
+.footer-logo {
+  display: block;
+}
+
+/* Make it align nicely with text */
+.footer__block-list {
+  align-items: flex-start;
+}
+
+.footer-logo-wrapper {
+  margin-bottom: 15px;
+}
+
+.footer-logo {
+  max-width: 160px;
+  display: block;
+}
+
+button.footer__title.heading.h6 {
+    font-family: Roboto;
+    font-weight: 700;
+    font-size: 20px;
+    line-height: 130%;
+    letter-spacing: 0px;
+}
+
+p.footer__title.heading.h6 {
+    font-family: Roboto;
+    font-weight: 700;
+    font-size: 20px;
+    line-height: 130%;
+    letter-spacing: 0px;
+}
+
+p.footer__aside-title {
+    display: none;
+}
+
+aside.footer__aside {
+    border-top: 1px solid;
+    padding: 20px;
+}
+
+/* Make all footer columns equal */
+.footer__block-list {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr); /* 5 columns */
+  gap: 40px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .footer__block-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.footer__block-item--newsletter {
+  max-width: 260px;
+}
+
+/* Title */
+.footer__block-item--newsletter .footer__title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+/* Text */
+.footer__newsletter-text {
+    font-family: Roboto;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 22px;
+    letter-spacing: 0px;
+    color: #fff;
+}
+
+/* Input row */
+.custom-input-wrapper {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.4);
+}
+
+/* Input */
+.custom-newsletter-input {
+  flex: 1;
+  padding: 14px 0;
+  min-height: 48px;
+}
+
+/* Arrow */
+.custom-submit-btn {
+  position: static; /* ✅ keeps in same row */
+  padding: 14px;
+  min-width: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>

@@ -1,0 +1,29 @@
+{%- comment -%}
+  Outputs "y" when a product ships on its own delivery rate and so does NOT count towards the
+  £500 free-delivery threshold, otherwise "n". Mirrors the shipping profiles in Shopify
+  (Settings > Shipping and delivery), Sep 2026:
+    Towel Rads        Heated towel rails, free
+    Bathroom Products shower sets and bath shower mixers, free
+    Showers TP        vendor "TP - Showers", free
+    Kart Taps         vendor "Kartell" (taps, showers, accessories, basins), free
+    LED mirror/Lumora LED mirrors (mirrors template), £5.99
+    Sample profiles   samples, free or £2.99
+  Everything else (tiles, adhesive, grout, boards, radiators, toilets, vanities...) is in the
+  General profile: £39.99 under £500, free from £500.
+  If a product is moved between shipping profiles, update the rules here too.
+{%- endcomment -%}
+{%- liquid
+  assign tod = 'n'
+  assign tod_type = product.type | downcase
+  assign tod_title = product.title | downcase
+  if tod_type contains 'towel rail' or tod_type contains 'shower set' or tod_type contains 'bath shower mixer'
+    assign tod = 'y'
+  elsif product.vendor == 'Kartell' or product.vendor == 'TP - Showers'
+    assign tod = 'y'
+  elsif product.template_suffix == 'mirrors-v2' or product.template_suffix == 'mirrors' or product.template_suffix == 'led-mirrors'
+    assign tod = 'y'
+  elsif product.tags contains 'Samples' or tod_type contains 'sample' or tod_title contains '[free sample]'
+    assign tod = 'y'
+  endif
+  echo tod
+-%}

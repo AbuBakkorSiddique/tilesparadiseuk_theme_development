@@ -1,0 +1,289 @@
+{%- comment -%}
+  TP range picker for non-tile product templates (taps, showers, toilets, mirrors, heating,
+  valves, wastes, accessories). Replaces the old swatch code on those templates.
+
+  "Family" = products in the same range that use the same product template and are the same
+  kind (tap vs non-tap, accessory vs main item). So taps, showers and accessories that share
+  a range (e.g. Oriana) never link to each other.
+
+  Colour swatches keep the current type/size: Bar Shower in Brushed Brass -> Bar Shower in Matt Black,
+  700x500mm + Bluetooth in Matt Black -> 700x500mm + Bluetooth in Brushed Gold.
+  The second row lists the other types/sizes in the current colour (pills, or a dropdown if more than 6).
+  Data used: custom.range (product_range metaobject), custom.colour_name, custom.colour_hex,
+  custom.size_name (falls back to custom.size).
+{%- endcomment -%}
+{%- liquid
+  assign tpr_range = product.metafields.custom.range.value
+  assign tpr_sibs = tpr_range.products.value
+
+  assign tpr_ptype = product.type | downcase
+  assign tpr_fam = product.template_suffix | append: '|'
+  if tpr_ptype contains 'accessor'
+    assign tpr_fam = tpr_fam | append: 'a'
+  endif
+  if tpr_ptype contains 'tap'
+    assign tpr_fam = tpr_fam | append: 't'
+  endif
+
+  assign tpr_cur_col = product.metafields.custom.colour_name.value | strip
+  assign tpr_cur_opt = product.metafields.custom.size_name.value | strip
+  if tpr_cur_opt == blank
+    assign tpr_cur_opt = product.metafields.custom.size.value | strip
+  endif
+
+  case product.template_suffix
+    when 'taps', 'kitchen-taps', 'boiling-taps'
+      assign tpr_label = 'Tap Type'
+    when 'shower', 'toilets', 'radiator-valves', 'wastes'
+      assign tpr_label = 'Type'
+    when 'bath-accessories'
+      assign tpr_label = 'Item'
+    else
+      assign tpr_label = 'Size'
+  endcase
+  if tpr_ptype contains 'accessor'
+    assign tpr_label = 'Item'
+  endif
+  assign tpr_rl = tpr_range.option_label.value | strip
+  if tpr_rl != blank and tpr_rl != 'Product' and tpr_rl != 'Size'
+    assign tpr_label = tpr_rl
+  endif
+
+  assign tpr_cols = ''
+  assign tpr_col_n = 0
+  assign tpr_opts = ''
+  assign tpr_opt_n = 0
+  for s in tpr_sibs
+    assign s_ptype = s.type | downcase
+    assign s_fam = s.template_suffix | append: '|'
+    if s_ptype contains 'accessor'
+      assign s_fam = s_fam | append: 'a'
+    endif
+    if s_ptype contains 'tap'
+      assign s_fam = s_fam | append: 't'
+    endif
+    if s_fam != tpr_fam
+      continue
+    endif
+    assign s_col = s.metafields.custom.colour_name.value | strip
+    if s_col != blank
+      assign k = '||' | append: s_col | append: '||'
+      unless tpr_cols contains k
+        assign tpr_cols = tpr_cols | append: k
+        assign tpr_col_n = tpr_col_n | plus: 1
+      endunless
+    endif
+    if tpr_cur_col == blank or s_col == tpr_cur_col
+      assign s_opt = s.metafields.custom.size_name.value | strip
+      if s_opt == blank
+        assign s_opt = s.metafields.custom.size.value | strip
+      endif
+      if s_opt != blank
+        assign k = '||' | append: s_opt | append: '||'
+        unless tpr_opts contains k
+          assign tpr_opts = tpr_opts | append: k
+          assign tpr_opt_n = tpr_opt_n | plus: 1
+        endunless
+      endif
+    endif
+  endfor
+
+  assign tpr_use_select = false
+  if tpr_opt_n > 6
+    assign tpr_use_select = true
+  endif
+-%}
+
+{%- if tpr_col_n > 1 or tpr_opt_n > 1 -%}
+<style>
+  .tpr { margin: 1.5rem 0; padding: 1.375rem 0; border-top: 1px solid #ececec; border-bottom: 1px solid #ececec; }
+  .tpr > * + * { margin-top: 1.375rem; }
+  .tpr__label { display: flex; align-items: baseline; gap: .4rem; margin-bottom: .875rem; font-size: .9375rem; line-height: 1.4; }
+  .tpr__label strong { font-weight: 700; color: #111; }
+  .tpr__label span { font-weight: 400; color: #555; }
+  .tpr__list { display: flex; flex-wrap: wrap; gap: .75rem; list-style: none; margin: 0; padding: 0; }
+  .tpr__list li { margin: 0; padding: 0; }
+  .tpr__list li::before { display: none; }
+  .tpr__swatch { display: block; width: 34px; height: 34px; border-radius: 50%; padding: 3px; box-shadow: inset 0 0 0 1px #e3e3e3; transition: box-shadow .18s ease; }
+  .tpr__swatch-in { display: block; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; position: relative; }
+  .tpr__swatch-in img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.9); transform-origin: center center; }
+  .tpr__colour { display: block; width: 100%; height: 100%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+  .tpr__fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: #f2f2f2; font-size: 1rem; font-weight: 600; color: #555; }
+  .tpr__swatch:hover { box-shadow: inset 0 0 0 1px #9a9a9a; }
+  .tpr__swatch.is-current { box-shadow: inset 0 0 0 2px #111; }
+  .tpr__swatch.is-soldout { opacity: .4; }
+  .tpr__pill { display: inline-flex; align-items: center; justify-content: center; min-width: 112px; min-height: 44px; padding: .7rem 1.25rem; border: 1px solid #dcdcdc; border-radius: 999px; font-size: .875rem; font-weight: 600; line-height: 1.2; text-align: center; color: #111; background: #fff; text-decoration: none; transition: border-color .18s ease, background .18s ease, color .18s ease; }
+  .tpr__pill:hover:not(.is-current) { border-color: #111; }
+  .tpr__pill.is-current { background: #016FD0; border-color: #016FD0; color: #fff; box-shadow: 0 1px 6px rgba(1,111,208,.28); }
+  .tpr__pill.is-soldout { color: #8a8a8a; text-decoration: line-through; }
+  .tpr__pill.is-soldout.is-current { background: #fff; border-color: #dcdcdc; color: #8a8a8a; box-shadow: none; }
+  .tpr__select { position: relative; max-width: 360px; }
+  .tpr__select select { width: 100%; min-height: 46px; padding: .6rem 2.4rem .6rem .9rem; border: 2px solid #e6e6e6; border-radius: 4px; font-size: .9375rem; color: #111; background: #fff; -webkit-appearance: none; appearance: none; cursor: pointer; }
+  .tpr__select select:focus { outline: none; border-color: #016FD0; }
+  .tpr__select::after { content: ''; position: absolute; right: 14px; top: 50%; width: 8px; height: 8px; margin-top: -6px; border-right: 2px solid #555; border-bottom: 2px solid #555; transform: rotate(45deg); pointer-events: none; }
+  @media (max-width: 480px) {
+    .tpr__pill { min-width: 0; flex: 1 1 calc(50% - .75rem); padding: .7rem 1rem; }
+    .tpr__select { max-width: none; }
+  }
+</style>
+
+<div class="tpr">
+
+  {%- if tpr_col_n > 1 -%}
+    <div class="tpr__colours">
+      <div class="tpr__label"><strong>Colour:</strong><span>{{ tpr_cur_col }}</span></div>
+      <ul class="tpr__list" role="list">
+        {%- assign tpr_shown = '' -%}
+        {%- for s in tpr_sibs -%}
+          {%- liquid
+            assign s_ptype = s.type | downcase
+            assign s_fam = s.template_suffix | append: '|'
+            if s_ptype contains 'accessor'
+              assign s_fam = s_fam | append: 'a'
+            endif
+            if s_ptype contains 'tap'
+              assign s_fam = s_fam | append: 't'
+            endif
+            assign s_col = s.metafields.custom.colour_name.value | strip
+            assign tpr_skip = false
+            if s_fam != tpr_fam or s_col == blank
+              assign tpr_skip = true
+            else
+              assign k = '||' | append: s_col | append: '||'
+              if tpr_shown contains k
+                assign tpr_skip = true
+              endif
+            endif
+          -%}
+          {%- if tpr_skip -%}{%- continue -%}{%- endif -%}
+          {%- liquid
+            assign tpr_shown = tpr_shown | append: k
+            assign tpr_target = s
+            if s_col == tpr_cur_col
+              assign tpr_target = product
+            else
+              for t in tpr_sibs
+                assign t_ptype = t.type | downcase
+                assign t_fam = t.template_suffix | append: '|'
+                if t_ptype contains 'accessor'
+                  assign t_fam = t_fam | append: 'a'
+                endif
+                if t_ptype contains 'tap'
+                  assign t_fam = t_fam | append: 't'
+                endif
+                if t_fam != tpr_fam
+                  continue
+                endif
+                assign t_col = t.metafields.custom.colour_name.value | strip
+                assign t_opt = t.metafields.custom.size_name.value | strip
+                if t_opt == blank
+                  assign t_opt = t.metafields.custom.size.value | strip
+                endif
+                if t_col == s_col and t_opt == tpr_cur_opt
+                  assign tpr_target = t
+                  break
+                endif
+              endfor
+            endif
+            assign hex = s.metafields.custom.colour_hex.value | strip
+            if hex != blank
+              unless hex contains '#'
+                assign hex = '#' | append: hex
+              endunless
+            endif
+          -%}
+          <li>
+            <a href="{{ tpr_target.url }}"
+               class="tpr__swatch{% if s_col == tpr_cur_col %} is-current{% endif %}{% unless tpr_target.available %} is-soldout{% endunless %}"
+               title="{{ s_col | escape }}{% unless tpr_target.available %} (sold out){% endunless %}"
+               aria-label="Choose colour {{ s_col | escape }}{% unless tpr_target.available %}, sold out{% endunless %}"
+               {% if s_col == tpr_cur_col %}aria-current="page"{% endif %}>
+              <span class="tpr__swatch-in">
+                {%- if hex != blank -%}
+                  <span class="tpr__colour" style="background-color: {{ hex | escape }};"></span>
+                {%- elsif s.featured_image -%}
+                  <img src="{{ s.featured_image | image_url: width: 120 }}" alt="{{ s_col | escape }}" width="34" height="34" loading="lazy">
+                {%- else -%}
+                  <span class="tpr__fallback">{{ s_col | slice: 0 }}</span>
+                {%- endif -%}
+              </span>
+            </a>
+          </li>
+        {%- endfor -%}
+      </ul>
+    </div>
+  {%- endif -%}
+
+  {%- if tpr_opt_n > 1 -%}
+    <div class="tpr__options">
+      {%- if tpr_use_select -%}
+        <div class="tpr__label"><strong>{{ tpr_label }}:</strong></div>
+        <div class="tpr__select">
+          <select aria-label="{{ tpr_label | escape }}" onchange="if(this.value){window.location.href=this.value}">
+      {%- else -%}
+        <div class="tpr__label"><strong>{{ tpr_label }}:</strong><span>{{ tpr_cur_opt }}</span></div>
+        <ul class="tpr__list" role="list">
+      {%- endif -%}
+
+      {%- assign tpr_shown_o = '' -%}
+      {%- for s in tpr_sibs -%}
+        {%- liquid
+          assign s_ptype = s.type | downcase
+          assign s_fam = s.template_suffix | append: '|'
+          if s_ptype contains 'accessor'
+            assign s_fam = s_fam | append: 'a'
+          endif
+          if s_ptype contains 'tap'
+            assign s_fam = s_fam | append: 't'
+          endif
+          assign s_col = s.metafields.custom.colour_name.value | strip
+          assign s_opt = s.metafields.custom.size_name.value | strip
+          if s_opt == blank
+            assign s_opt = s.metafields.custom.size.value | strip
+          endif
+          assign tpr_skip = false
+          if s_fam != tpr_fam or s_opt == blank
+            assign tpr_skip = true
+          elsif tpr_cur_col != blank and s_col != tpr_cur_col
+            assign tpr_skip = true
+          else
+            assign k = '||' | append: s_opt | append: '||'
+            if tpr_shown_o contains k
+              assign tpr_skip = true
+            endif
+          endif
+        -%}
+        {%- if tpr_skip -%}{%- continue -%}{%- endif -%}
+        {%- liquid
+          assign tpr_shown_o = tpr_shown_o | append: k
+          assign tpr_o_target = s
+          if s_opt == tpr_cur_opt
+            assign tpr_o_target = product
+          endif
+        -%}
+        {%- if tpr_use_select -%}
+          <option value="{{ tpr_o_target.url }}"{% if s_opt == tpr_cur_opt %} selected{% endif %}>
+            {{- s_opt | escape -}}{% unless tpr_o_target.available %} (sold out){% endunless %}
+          </option>
+        {%- else -%}
+          <li>
+            <a href="{{ tpr_o_target.url }}"
+               class="tpr__pill{% if s_opt == tpr_cur_opt %} is-current{% endif %}{% unless tpr_o_target.available %} is-soldout{% endunless %}"
+               {% if s_opt == tpr_cur_opt %}aria-current="page"{% endif %}>
+              {{ s_opt | escape }}{% unless tpr_o_target.available %}<span class="visually-hidden">, sold out</span>{% endunless %}
+            </a>
+          </li>
+        {%- endif -%}
+      {%- endfor -%}
+
+      {%- if tpr_use_select -%}
+          </select>
+        </div>
+      {%- else -%}
+        </ul>
+      {%- endif -%}
+    </div>
+  {%- endif -%}
+
+</div>
+{%- endif -%}

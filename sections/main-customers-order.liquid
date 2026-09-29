@@ -112,9 +112,9 @@
               <div class="order-summary__alert">
                 {%- if fulfillment.tracking_url != blank and fulfillment.tracking_number != blank -%}
                   <p class="alert alert--large alert--success">{{ 'customer.order.fulfillment_with_url_and_number_html' | t: tracking_url: fulfillment.tracking_url, tracking_number: fulfillment.tracking_number }}</p>
-                {%- elsif fulfillment.tracking_url != blank -%}
+                {%- elsif fullfillment.tracking_url != blank -%}
                   <p class="alert alert--large alert--success">{{ 'customer.order.fulfillment_with_url_html' | t: tracking_url: fulfillment.tracking_url }}</p>
-                {%- elsif fulfillment.tracking_number != blank -%}
+                {%- elsif fullfilment.tracking_number != blank -%}
                   <p class="alert alert--large alert--success">{{ 'customer.order.fulfillment_with_number_html' | t: tracking_number: fulfillment.tracking_number }}</p>
                 {%- else -%}
                   <p class="alert alert--large alert--success">{{ 'customer.order.fulfillment_html' | t }}</p>
@@ -140,7 +140,7 @@
                       <div class="line-item__product-info-wrapper">
                         <div class="line-item__image-wrapper">
                           <div class="aspect-ratio aspect-ratio--square">
-                            <img loading="lazy" width="{{ line_item.image.width }}" height="{{ line_item.image.height }}" src="{{ line_item.image | img_url: '90x90', scale: 2 }}" alt="{{ line_item.image.alt | escape }}">
+                            <img loading="lazy" src="{{ line_item.image | img_url: '90x90', scale: 2 }}" alt="{{ line_item.image.alt | escape }}">
                           </div>
                         </div>
 
@@ -174,10 +174,17 @@
                             {%- endif -%}
                           </div>
 
-                          {%- if line_item.unit_price -%}
+                          {%- if line_item.unit_price_measurement -%}
                             <div class="line-item__price-info">
                               <div class="unit-price-measurement">
-                                {{- line_item.unit_price | unit_price_with_measurement: line_item.unit_price_measurement -}}
+                                <span class="unit-price-measurement__price">{{ line_item.unit_price | money }}</span>
+                                <span class="unit-price-measurement__separator">/ </span>
+
+                                {%- if line_item.unit_price_measurement.reference_value != 1 -%}
+                                  <span class="unit-price-measurement__reference-value">{{ line_item.unit_price_measurement.reference_value }}</span>
+                                {%- endif -%}
+
+                                <span class="unit-price-measurement__reference-unit">{{ line_item.unit_price_measurement.reference_unit }}</span>
                               </div>
                             </div>
                           {%- endif -%}
@@ -206,9 +213,9 @@
                         <td colspan="3">
                           {%- if line_item.fulfillment.tracking_url != blank and line_item.fulfillment.tracking_number != blank -%}
                             <p class="alert alert--large alert--success">{{ 'customer.order.line_fulfillment_with_url_and_number_html' | t: tracking_url: line_item.fulfillment.tracking_url, tracking_number: line_item.fulfillment.tracking_number }}</p>
-                          {%- elsif fulfillment.tracking_url != blank -%}
+                          {%- elsif fullfillment.tracking_url != blank -%}
                             <p class="alert alert--large alert--success">{{ 'customer.order.line_fulfillment_with_url_html' | t: tracking_url: line_item.fulfillment.tracking_url }}</p>
-                          {%- elsif fulfillment.tracking_number != blank -%}
+                          {%- elsif fullfilment.tracking_number != blank -%}
                             <p class="alert alert--large alert--success">{{ 'customer.order.line_fulfillment_with_number_html' | t: tracking_number: line_item.fulfillment.tracking_number }}</p>
                           {%- else -%}
                             <p class="alert alert--large alert--success">{{ 'customer.order.line_fulfillment_html' | t }}</p>

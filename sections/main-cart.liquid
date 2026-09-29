@@ -1,10 +1,58 @@
+{%- if template.name == 'cart' -%}
+<style>
+/* 1. Fix mobile scroll by preventing wrapping (which caused items to be clipped by overflow-y: hidden) */
+.template-cart .product-list--scrollable {
+  flex-wrap: nowrap !important;
+  display: flex !important;
+}
+
+/* 2. Reset Flickity on Desktop if it fails and stacks items absolutely */
+.template-cart .product-list--scrollable .flickity-slider {
+  position: static !important;
+  display: flex !important;
+  transform: none !important;
+  width: 100% !important;
+}
+.template-cart .product-list--scrollable .flickity-viewport {
+  height: auto !important;
+  overflow: visible !important;
+}
+.template-cart .product-list--scrollable .product-item {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+}
+
+/* 3. Enable visible desktop scrollbar */
+@media screen and (min-width: 1000px) {
+  .template-cart .scroller__inner {
+    padding-bottom: 12px !important;
+    margin-bottom: 0 !important;
+    overflow-x: auto !important;
+  }
+  .template-cart .scroller__inner::-webkit-scrollbar {
+    display: block !important;
+    height: 8px !important;
+  }
+  .template-cart .scroller__inner::-webkit-scrollbar-track {
+    background: #f1f1f1 !important;
+    border-radius: 4px !important;
+  }
+  .template-cart .scroller__inner::-webkit-scrollbar-thumb {
+    background: #bbb !important;
+    border-radius: 4px !important;
+  }
+}
+</style>
+{%- endif -%}
 {%- capture section_settings -%}
 {
-  "showShippingEstimator": {% if cart.item_count == 0 or cart.requires_shipping == false %}false{% else %}{{ section.settings.show_shipping_estimator | json }}{% endif %}
+  "showShippingEstimator": {% if cart.item_count == 0 %}false{% else %}{{ section.settings.show_shipping_estimator | json }}{% endif %}
 }
 {%- endcapture -%}
 
-<section data-section-id="{{ section.id }}" data-section-type="cart" data-section-settings="{{ section_settings | escape_once }}" data-item-count="{{ cart.item_count }}">
+<section class="{{ section.settings.custom_css_class }}" data-section-id="{{ section.id }}" data-section-type="cart" data-section-settings='{{ section_settings }}' data-item-count="{{ cart.item_count }}">
   {%- if cart.item_count == 0 -%}
     <div class="container">
       <div class="empty-state">
@@ -100,7 +148,13 @@
                               {%- if gift_wrap_product.handle == line_item.product.handle -%}
                                 <span class="line-item__title text--strong">{{ line_item.title }}</span>
                               {%- else -%}
-                                <a href="{{ line_item.url }}" class="line-item__title link text--strong">{{ line_item.title }}</a>
+                                {%- if line_item.final_price == 0 -%}
+                                  {{ line_item.title }}
+                                  {% else %}
+                                <a href="{{ line_item.url }}" class="line-item__title link text--strong">
+                                {{ line_item.title }}
+                                </a>
+                                  {% endif %}
                               {%- endif -%}
 
                               {%- if line_item.selling_plan_allocation -%}
@@ -147,11 +201,17 @@
                                 {%- endif -%}
                               </div>
 
-
-                              {%- if line_item.unit_price -%}
+                              {%- if line_item.unit_price_measurement -%}
                                 <div class="line-item__price-info">
                                   <div class="unit-price-measurement">
-                                    {{- line_item.unit_price | unit_price_with_measurement: line_item.unit_price_measurement -}}
+                                    <span class="unit-price-measurement__price">{{ line_item.unit_price | money }}</span>
+                                    <span class="unit-price-measurement__separator">/ </span>
+
+                                    {%- if line_item.unit_price_measurement.reference_value != 1 -%}
+                                      <span class="unit-price-measurement__reference-value">{{ line_item.unit_price_measurement.reference_value }}</span>
+                                    {%- endif -%}
+
+                                    <span class="unit-price-measurement__reference-unit">{{ line_item.unit_price_measurement.reference_unit }}</span>
                                   </div>
                                 </div>
                               {%- endif -%}
@@ -171,41 +231,21 @@
 
                                 {%- unless line_item.product.tags contains '__gift' -%}
                                   <div class="quantity-selector">
-                                    {% liquid
-                                      assign max_quantity = ''
-                                      assign variant = line_item.variant
-                                
-                                      if variant.inventory_management != blank and variant.inventory_policy == 'deny'
-                                        assign current_quantity_for_variant = cart | item_count_for_variant: variant.id
-                                        assign max_quantity = variant.inventory_quantity | minus: current_quantity_for_variant | plus: line_item.quantity
-                                      endif
-                                
-                                      if variant.quantity_rule.max != nil
-                                        assign max_quantity = max_quantity | default: 999999 | at_most: variant.quantity_rule.max
-                                      endif
-              
-                                      assign increment = line_item.quantity | plus: line_item.variant.quantity_rule.increment
-              
-                                      if line_item.variant.quantity_rule.max != nil
-                                        assign increment = increment | at_most: line_item.variant.quantity_rule.max
-                                      endif
+                                    {%- assign allow_to_add_more = true -%}
 
-                                      assign reduce_quantity = line_item.quantity | minus: line_item.variant.quantity_rule.increment | at_least: 0
+                                    {%- if line_item.variant.inventory_management and line_item.variant.inventory_policy == 'deny' and line_item.quantity == line_item.variant.inventory_quantity -%}
+                                      {%- assign allow_to_add_more = false -%}
+                                    {%- endif -%}
 
-                                      if line_item.variant.inventory_management == 'shopify'
-                                        assign reduce_quantity = reduce_quantity | at_most: line_item.variant.inventory_quantity
-                                      endif
-                                    %}
-
-                                    <button type="button" class="quantity-selector__button" data-action="decrease-quantity" data-href="{{ routes.cart_change_url }}?quantity={{ reduce_quantity }}&line={{ forloop.index }}" data-quantity="{{ line_item.quantity | minus: line_item.variant.quantity_rule.increment | at_least: 0 }}" data-line="{{ forloop.index }}" aria-label="{{ 'cart.items.decrease_quantity' | t }}" title="{{ 'cart.items.decrease_quantity' | t }}">{% render 'icon', icon: 'minus' %}</button>
-                                    <input aria-label="{{ 'product.form.quantity' | t }}" type="number" class="quantity-selector__value" inputmode="numeric" data-current-value="{{ line_item.quantity }}" data-line="{{ forloop.index }}" value="{{ line_item.quantity }}" step="{{ line_item.variant.quantity_rule.increment }}" min="{{ line_item.variant.quantity_rule.min }}" {% if line_item.variant.quantity_rule.max != nil %}max="{{ line_item.variant.quantity_rule.max }}"{% endif %}>
-                                    <button type="button" class="quantity-selector__button" data-action="increase-quantity" data-href="{{ routes.cart_change_url }}?quantity={{ increment }}&line={{ forloop.index }}" data-quantity="{{ increment }}" data-line="{{ forloop.index }}" {% if max_quantity == blank or line_item.quantity < max_quantity %}aria-label="{{ 'cart.items.increase_quantity' | t }}" title="{{ 'cart.items.increase_quantity' | t }}"{% else %}disabled="disabled" aria-label="{{ 'cart.items.no_more_stock' | t }}" data-tooltip="{{ 'cart.items.no_more_stock' | t }}" data-tooltip-position="bottom-left"{% endif %}>{% render 'icon', icon: 'plus' %}</button>
+                                    <button type="button" class="quantity-selector__button" data-action="decrease-quantity" data-href="{{ routes.cart_change_url }}?quantity={{ line_item.quantity | minus: 1 }}&id={{ line_item.key }}" data-quantity="{{ line_item.quantity | minus: 1 }}" data-line="{{ line_item.key }}" aria-label="{{ 'cart.items.decrease_quantity' | t }}" title="{{ 'cart.items.decrease_quantity' | t }}">{% render 'icon', icon: 'minus' %}</button>
+                                    <input aria-label="{{ 'product.form.quantity' | t }}" class="quantity-selector__value" inputmode="numeric" data-current-value="{{ line_item.quantity }}" data-line="{{ line_item.key }}" value="{{ line_item.quantity }}" size="{{ line_item.quantity | append: '' | size | at_least: 2 }}">
+                                    <button type="button" class="quantity-selector__button" data-action="increase-quantity" data-href="{{ routes.cart_change_url }}?quantity={{ line_item.quantity | plus: 1 }}&id={{ line_item.key }}" data-quantity="{{ line_item.quantity | plus: 1 }}" data-line="{{ line_item.key }}" {% if allow_to_add_more %}aria-label="{{ 'cart.items.increase_quantity' | t }}" title="{{ 'cart.items.increase_quantity' | t }}"{% else %}disabled="disabled" aria-label="{{ 'cart.items.no_more_stock' | t }}" data-tooltip="{{ 'cart.items.no_more_stock' | t }}" data-tooltip-position="bottom-left"{% endif %}>{% render 'icon', icon: 'plus' %}</button>
                                   </div>
                                 {%- else -%}
                                   <span>{{ line_item.quantity }}</span>
                                 {% endunless -%}
 
-                                <a href="{{ routes.cart_change_url }}?quantity=0&line={{ forloop.index }}" data-action="decrease-quantity" data-quantity="0" data-line="{{ forloop.index }}" class="line-item__quantity-remove link">{{ 'cart.items.remove' | t }}</a>
+                                <a href="{{ routes.cart_change_url }}?quantity=0&id={{ line_item.key }}" data-action="decrease-quantity" data-quantity="0" data-line="{{ line_item.key }}" data-href="{{ routes.cart_change_url }}?quantity=0&id={{ line_item.key }}" class="line-item__quantity-remove link">{{ 'cart.items.remove' | t }}</a>
                               </div>
                             </div>
                           </div>
@@ -216,41 +256,21 @@
 
                           {%- unless line_item.product.tags contains '__gift' -%}
                             <div class="quantity-selector">
-                              {% liquid
-                                assign max_quantity = ''
-                                assign variant = line_item.variant
-                          
-                                if variant.inventory_management != blank and variant.inventory_policy == 'deny'
-                                  assign current_quantity_for_variant = cart | item_count_for_variant: variant.id
-                                  assign max_quantity = variant.inventory_quantity | minus: current_quantity_for_variant | plus: line_item.quantity
-                                endif
-                          
-                                if variant.quantity_rule.max != nil
-                                  assign max_quantity = max_quantity | default: 999999 | at_most: variant.quantity_rule.max
-                                endif
-        
-                                assign increment = line_item.quantity | plus: line_item.variant.quantity_rule.increment
-        
-                                if line_item.variant.quantity_rule.max != nil
-                                  assign increment = increment | at_most: line_item.variant.quantity_rule.max
-                                endif
+                              {%- assign allow_to_add_more = true -%}
 
-                                assign reduce_quantity = line_item.quantity | minus: line_item.variant.quantity_rule.increment | at_least: 0
+                              {%- if line_item.variant.inventory_management and line_item.variant.inventory_policy == 'deny' and line_item.quantity == line_item.variant.inventory_quantity -%}
+                                {%- assign allow_to_add_more = false -%}
+                              {%- endif -%}
 
-                                if line_item.variant.inventory_management == 'shopify'
-                                  assign reduce_quantity = reduce_quantity | at_most: line_item.variant.inventory_quantity
-                                endif
-                              %}
-                              
-                              <button type="button" class="quantity-selector__button" data-action="decrease-quantity" data-href="{{ routes.cart_change_url }}?quantity={{ reduce_quantity }}&line={{ forloop.index }}" data-quantity="{{ line_item.quantity | minus: line_item.variant.quantity_rule.increment | at_least: 0 }}" data-line="{{ forloop.index }}" aria-label="{{ 'cart.items.decrease_quantity' | t }}" title="{{ 'cart.items.decrease_quantity' | t }}">{% render 'icon', icon: 'minus' %}</button>
-                              <input aria-label="{{ 'product.form.quantity' | t }}" type="number" class="quantity-selector__value" inputmode="numeric" data-current-value="{{ line_item.quantity }}" data-line="{{ forloop.index }}" value="{{ line_item.quantity }}" step="{{ line_item.variant.quantity_rule.increment }}" min="{{ line_item.variant.quantity_rule.min }}" {% if line_item.variant.quantity_rule.max != nil %}max="{{ line_item.variant.quantity_rule.max }}"{% endif %}>
-                              <button type="button" class="quantity-selector__button" data-action="increase-quantity" data-href="{{ routes.cart_change_url }}?quantity={{ increment }}&line={{ forloop.index }}" data-quantity="{{ increment }}" data-line="{{ forloop.index }}" {% if max_quantity == blank or line_item.quantity < max_quantity %}aria-label="{{ 'cart.items.increase_quantity' | t }}" title="{{ 'cart.items.increase_quantity' | t }}"{% else %}disabled="disabled" aria-label="{{ 'cart.items.no_more_stock' | t }}" data-tooltip="{{ 'cart.items.no_more_stock' | t }}" data-tooltip-position="bottom-left"{% endif %}>{% render 'icon', icon: 'plus' %}</button>
+                              <button type="button" class="quantity-selector__button" data-action="decrease-quantity" data-href="{{ routes.cart_change_url }}?quantity={{ line_item.quantity | minus: 1 }}&id={{ line_item.key }}" data-quantity="{{ line_item.quantity | minus: 1 }}" data-line="{{ line_item.key }}" aria-label="{{ 'cart.items.decrease_quantity' | t }}" title="{{ 'cart.items.decrease_quantity' | t }}">{% render 'icon', icon: 'minus' %}</button>
+                              <input aria-label="{{ 'product.form.quantity' | t }}" class="quantity-selector__value" inputmode="numeric" data-current-value="{{ line_item.quantity }}" data-line="{{ line_item.key }}" value="{{ line_item.quantity }}" size="{{ line_item.quantity | append: '' | size | at_least: 2 }}">
+                              <button type="button" class="quantity-selector__button" data-action="increase-quantity" data-href="{{ routes.cart_change_url }}?quantity={{ line_item.quantity | plus: 1 }}&id={{ line_item.key }}" data-quantity="{{ line_item.quantity | plus: 1 }}" data-line="{{ line_item.key }}" {% if allow_to_add_more %}aria-label="{{ 'cart.items.increase_quantity' | t }}" title="{{ 'cart.items.increase_quantity' | t }}"{% else %}disabled="disabled" aria-label="{{ 'cart.items.no_more_stock' | t }}" data-tooltip="{{ 'cart.items.no_more_stock' | t }}" data-tooltip-position="bottom-left"{% endif %}>{% render 'icon', icon: 'plus' %}</button>
                             </div>
                           {%- else -%}
                             <span>{{ line_item.quantity }}</span>
                           {%- endunless -%}
 
-                          <a href="{{ routes.cart_change_url }}?quantity=0&line={{ forloop.index }}" data-action="decrease-quantity" data-quantity="0" data-line="{{ forloop.index }}" class="line-item__quantity-remove link">{{ 'cart.items.remove' | t }}</a>
+                          <a href="{{ routes.cart_change_url }}?quantity=0&id={{ line_item.key }}" data-action="decrease-quantity" data-quantity="0" data-line="{{ line_item.key }}" data-href="{{ routes.cart_change_url }}?quantity=0&id={{ line_item.key }}" class="line-item__quantity-remove link">{{ 'cart.items.remove' | t }}</a>
                         </td>
 
                         <td class="line-item__line-price table__cell--right hidden-phone">
@@ -309,9 +329,7 @@
                       <input type="hidden" name="quantity" value="1">
                       <input type="hidden" name="id" data-sku="{{ gift_wrap_product.first_available_variant.sku }}" value="{{ gift_wrap_product.first_available_variant.id }}">
 
-                      <buy-button class="buy-button">
-                        <button type="submit" class="button button--secondary">{{ section.settings.gift_wrap_button | escape }}</button>
-                      </buy-button>
+                      <button type="submit" class="button button--secondary" data-action="add-to-cart">{{ section.settings.gift_wrap_button | escape }}</button>
                     {%- endform -%}
                   </div>
                 </div>
@@ -389,6 +407,25 @@
               <div class="cart-recap__scroller">
                 <div class="card">
                   <div class="card__section">
+
+                    {%- comment -%} ===== Free-delivery progress — lives in the order summary, above the Total ===== {%- endcomment -%}
+                    {%- if settings.cart_show_free_shipping_threshold -%}
+                      {%- assign tp_threshold = settings.cart_free_shipping_threshold | times: 100 -%}
+                      {%- if cart.total_price >= tp_threshold -%}{%- assign tp_pct = 100 -%}
+                      {%- else -%}{%- assign tp_pct = cart.total_price | times: 100 | divided_by: tp_threshold -%}{%- endif -%}
+                      <div class="tp-ship-progress">
+                        <p class="tp-ship-progress__msg">
+                          {%- if cart.total_price >= tp_threshold -%}
+                            You've unlocked <strong>FREE UK delivery</strong>
+                          {%- else -%}
+                            Add <strong>{{ tp_threshold | minus: cart.total_price | money }}</strong> more for <strong>FREE UK delivery</strong>
+                          {%- endif -%}
+                        </p>
+                        <div class="tp-ship-progress__track"><span class="tp-ship-progress__fill" style="width:{{ tp_pct }}%"></span></div>
+                      </div>
+                    {%- endif -%}
+                    {%- comment -%} ===== /Free-delivery progress ===== {%- endcomment -%}
+
                     {%- if cart.cart_level_discount_applications != blank -%}
                       {%- for discount_application in cart.cart_level_discount_applications -%}
                         <div class="cart-recap__price-line cart-recap__price-line--highlight text--pull">
@@ -400,7 +437,7 @@
 
                     <div class="cart-recap__price-line text--pull">
                       <span class="cart-recap__price-line-label">{{ 'cart.general.total' | t }}</span>
-                      <span class="cart-recap__price-line-price">{{ cart.total_price | money_with_currency }}</span>
+                      <span class="cart-recap__price-line-price">{{ cart.total_price | money }}</span>
                     </div>
 
                     {%- comment -%}
@@ -463,7 +500,16 @@
 
                     <input type="hidden" name="attributes[collection_products_per_page]" value="">
                     <input type="hidden" name="attributes[collection_layout]" value="">
-                    <button type="submit" name="checkout" class="cart-recap__checkout button button--primary button--full button--large">{{ 'cart.general.checkout' | t }}</button>
+                    <button type="submit" name="checkout" class="cart-recap__checkout button button--primary button--full button--large custom-checkout-btn-selector">{{ 'cart.general.checkout' | t }}</button>
+
+                    {%- comment -%} ===== Express checkout (PayPal etc.) — shows only when accelerated checkouts are enabled ===== {%- endcomment -%}
+                    {%- if additional_checkout_buttons -%}
+                      <div class="cart-recap__express">
+                        <span class="cart-recap__express-label">Express checkout</span>
+                        <div class="additional-checkout-buttons">{{ content_for_additional_checkout_buttons }}</div>
+                      </div>
+                    {%- endif -%}
+                    {%- comment -%} ===== /Express checkout ===== {%- endcomment -%}
                   </div>
                 </div>
 
@@ -549,7 +595,7 @@
                     {%- endfor -%}
 
                     {%- if include_product -%}
-                      {%- render 'product-item', product: product, show_add_to_cart: true, grid_classes: '1/3--lap 1/3--desk 1/4--wide' -%}
+                      {%- render 'product-item', product: product, show_add_to_cart: true, show_shop_button: true, shop_button_label: 'Add to cart', grid_classes: '1/3--lap 1/3--desk 1/4--wide' -%}
 
                       {%- comment -%}Check how much products we have shown and limit{%- endcomment -%}
                       {%- assign upsell_products_count = upsell_products_count | plus: 1 -%}
@@ -569,7 +615,7 @@
                   }
                   {%- endcapture -%}
 
-                  <div class="section" data-section-id="{{ section.id }}-upsell" data-section-type="featured-collection" data-section-settings="{{ section_settings | escape_once }}">
+                  <div class="section" data-section-id="{{ section.id }}-upsell" data-section-type="featured-collection" data-section-settings='{{ section_settings }}'>
                     <header class="section__header">
                       <h2 class="section__title heading h3">{{ section.settings.upsell_heading | escape }}</h2>
                     </header>
@@ -635,7 +681,7 @@
     },
     {
       "type": "paragraph",
-      "content": "Gift wrap needs to be set up as a product."
+      "content": "Gift wrap needs to be set up as a product. [Read more](https://support.maestrooo.com/article/190-cart-set-up-a-gift-wrap-product)"
     },
     {
       "type": "product",
@@ -721,136 +767,32 @@
           "id": "icon",
           "label": "Icon",
           "options": [
-            {
-              "value": "bi-add-to-cart",
-              "label": "Add to cart",
-              "group": "Shop"
-            },
-            {
-              "value": "bi-gift-wrap",
-              "label": "Gift wrap",
-              "group": "Shop"
-            },
-            {
-              "value": "bi-gift-box",
-              "label": "Gift box",
-              "group": "Shop"
-            },
-            {
-              "value": "bi-heart",
-              "label": "Heart",
-              "group": "Shop"
-            },
-            {
-              "value": "bi-ecology",
-              "label": "Ecology",
-              "group": "Shop"
-            },
-            {
-              "value": "bi-plant",
-              "label": "Plant",
-              "group": "Shop"
-            },
-            {
-              "value": "bi-shop",
-              "label": "Shop",
-              "group": "Shop"
-            },
-            {
-              "value": "bi-shop-pin",
-              "label": "Shop with pin",
-              "group": "Shop"
-            },
-            {
-              "value": "bi-alert",
-              "label": "Alert",
-              "group": "Communication"
-            },
-            {
-              "value": "bi-chat",
-              "label": "Chat",
-              "group": "Communication"
-            },
-            {
-              "value": "bi-comment",
-              "label": "Comment",
-              "group": "Communication"
-            },
-            {
-              "value": "bi-customer-support",
-              "label": "Customer support",
-              "group": "Communication"
-            },
-            {
-              "value": "bi-email",
-              "label": "Email",
-              "group": "Communication"
-            },
-            {
-              "value": "bi-network",
-              "label": "Network",
-              "group": "Communication"
-            },
-            {
-              "value": "bi-newsletter",
-              "label": "Newsletter",
-              "group": "Communication"
-            },
-            {
-              "value": "bi-love",
-              "label": "Love",
-              "group": "Communication"
-            },
-            {
-              "value": "bi-phone",
-              "label": "Phone",
-              "group": "Communication"
-            },
-            {
-              "value": "bi-share",
-              "label": "Share",
-              "group": "Communication"
-            },
-            {
-              "value": "bi-delivery",
-              "label": "Delivery",
-              "group": "Delivery"
-            },
-            {
-              "value": "bi-fast-delivery",
-              "label": "Fast delivery",
-              "group": "Delivery"
-            },
-            {
-              "value": "bi-returns",
-              "label": "Returns",
-              "group": "Delivery"
-            },
-            {
-              "value": "bi-time",
-              "label": "Time",
-              "group": "Delivery"
-            },
-            {
-              "value": "bi-secure-payment",
-              "label": "Secure payment",
-              "group": "Security"
-            },
-            {
-              "value": "bi-mobile-payment",
-              "label": "Mobile payment",
-              "group": "Security"
-            },
-            {
-              "value": "bi-credit-card",
-              "label": "Credit card",
-              "group": "Security"
-            },
-            {
-              "value": "bi-shield",
-              "label": "Shield",
-              "group": "Security"
-            }
+            { "value": "bi-add-to-cart", "label": "Add to cart", "group": "Shop" },
+            { "value": "bi-gift-wrap", "label": "Gift wrap", "group": "Shop" },
+            { "value": "bi-gift-box", "label": "Gift box", "group": "Shop" },
+            { "value": "bi-heart", "label": "Heart", "group": "Shop" },
+            { "value": "bi-ecology", "label": "Ecology", "group": "Shop" },
+            { "value": "bi-plant", "label": "Plant", "group": "Shop" },
+            { "value": "bi-shop", "label": "Shop", "group": "Shop" },
+            { "value": "bi-shop-pin", "label": "Shop with pin", "group": "Shop" },
+            { "value": "bi-alert", "label": "Alert", "group": "Communication" },
+            { "value": "bi-chat", "label": "Chat", "group": "Communication" },
+            { "value": "bi-comment", "label": "Comment", "group": "Communication" },
+            { "value": "bi-customer-support", "label": "Customer support", "group": "Communication" },
+            { "value": "bi-email", "label": "Email", "group": "Communication" },
+            { "value": "bi-network", "label": "Network", "group": "Communication" },
+            { "value": "bi-newsletter", "label": "Newsletter", "group": "Communication" },
+            { "value": "bi-love", "label": "Love", "group": "Communication" },
+            { "value": "bi-phone", "label": "Phone", "group": "Communication" },
+            { "value": "bi-share", "label": "Share", "group": "Communication" },
+            { "value": "bi-delivery", "label": "Delivery", "group": "Delivery" },
+            { "value": "bi-fast-delivery", "label": "Fast delivery", "group": "Delivery" },
+            { "value": "bi-returns", "label": "Returns", "group": "Delivery" },
+            { "value": "bi-time", "label": "Time", "group": "Delivery" },
+            { "value": "bi-secure-payment", "label": "Secure payment", "group": "Security" },
+            { "value": "bi-mobile-payment", "label": "Mobile payment", "group": "Security" },
+            { "value": "bi-credit-card", "label": "Credit card", "group": "Security" },
+            { "value": "bi-shield", "label": "Shield", "group": "Security" }
           ],
           "default": "bi-customer-support"
         },

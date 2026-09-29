@@ -1,4 +1,4 @@
-<section class="section" data-section-id="{{ section.id }}" data-section-type="liquid">
+<section class="section{% if section.settings.liquid contains 'tp-sale-hero' %} section--sale-hero{% endif %}" data-section-id="{{ section.id }}" data-section-type="liquid">
   <div class="{% if section.settings.include_margins %}container{% endif %}">
     {%- if section.settings.title != blank -%}
       <header class="section__header">

@@ -1,0 +1,214 @@
+{%- comment -%}
+  TP finish row: automated cross-sell by finish (Tiles Paradise).
+  Params:
+    product         current product
+    mode            'finish' = other categories in the same finish, 'tiles' = tiles that suit the finish
+    tiles_handle    optional fixed tile collection (kitchen taps use kitchen-wall-tiles)
+    heading         optional heading override
+    heading_prefix  optional prefix, finish label is appended (used on tile pages)
+  Finish comes from a "finish-*" tag, then a "pairs-*" tag, then keywords in colour_name / title.
+  Collections, first match wins:
+    finish: "{key}-bathroom" smart collection, else the per-category finish collections in tp_map
+            (2 products per category, 8 max, skipping the current product's own category)
+    tiles : tiles_handle, else "tiles-for-{key}", else the tile collection paired with the finish in
+            tp_pair (brass -> gold-veined tiles, matt black -> Carrara marble, chrome -> grey,
+            nickel -> beige), else premium-bathroom-tiles
+  To add a finish or collection edit tp_map: key|Label|keywords|collection handles in display order
+{%- endcomment -%}
+{%- liquid
+  assign tp_map = 'antique-brass|Antique Brass|antique brass,antique gold|antique-gold-heated-towel-rails,antique-gold-radiators;brushed-brass|Brushed Brass|brushed brass,brushed gold,brass,gold|brushed-gold-showers,brushed-brass-taps,brass-gold-bathroom-led-mirrors,brushed-brass-heated-towel-rails,brushed-brass-bathroom-accessories;matt-black|Matt Black|matt black,black|black-showers,black-taps,black-bathroom-led-mirrors,black-heated-towel-rails,black-bathroom-accessories,black-radiators;chrome|Chrome|chrome|chrome-showers,chrome-taps,chrome-silver-bathroom-led-mirrors,chrome-heated-towel-rails,chrome-bathroom-accessories,chrome-radiator-valves;brushed-nickel|Brushed Nickel|brushed nickel,nickel|brushed-nickel-taps,brushed-nickel-bathroom-accessories;anthracite|Anthracite|anthracite|anthracite-grey-heated-towel-rails,anthracite-grey-radiators;white|White||white-heated-towel-rails,white-radiators' | split: ';'
+
+  assign tp_key = ''
+  for t in product.tags
+    assign td = t | downcase
+    if td contains 'finish-'
+      assign tp_key = td | split: 'finish-' | last | strip
+      break
+    endif
+  endfor
+  if tp_key == ''
+    for t in product.tags
+      assign td = t | downcase
+      if td contains 'pairs-'
+        assign tp_key = td | split: 'pairs-' | last | strip
+        break
+      endif
+    endfor
+  endif
+
+  assign tp_hay = product.metafields.custom.colour_name.value | append: ' ' | append: product.title | downcase
+  assign tp_label = ''
+  assign tp_cols = ''
+  for row in tp_map
+    assign rp = row | split: '|'
+    assign rk = rp[0]
+    if tp_key != ''
+      if rk == tp_key
+        assign tp_label = rp[1]
+        assign tp_cols = rp[3]
+        break
+      endif
+    else
+      assign kws = rp[2] | split: ','
+      for kw in kws
+        if kw != '' and tp_hay contains kw
+          assign tp_key = rk
+          break
+        endif
+      endfor
+      if tp_key != ''
+        assign tp_label = rp[1]
+        assign tp_cols = rp[3]
+        break
+      endif
+    endif
+  endfor
+  if tp_label == '' and tp_key != ''
+    assign tp_label = tp_key | replace: '-', ' ' | capitalize
+  endif
+
+  assign tp_mode = mode | default: 'finish'
+  assign tp_shop_url = ''
+  if tp_mode == 'tiles'
+    assign tp_per = 8
+    if tiles_handle != blank
+      assign tp_handles = tiles_handle
+    else
+      assign tp_h = 'tiles-for-' | append: tp_key
+      assign tp_pair = 'brushed-brass:bathroom-gold-tiles;antique-brass:bathroom-gold-tiles;matt-black:carrara-marble-tiles;chrome:bathroom-grey-tiles;brushed-nickel:bathroom-beige-tiles;anthracite:bathroom-grey-tiles;white:bathroom-white-tiles' | split: ';'
+      assign tp_pair_h = ''
+      for pr in tp_pair
+        assign prp = pr | split: ':'
+        if prp[0] == tp_key
+          assign tp_pair_h = prp[1]
+          break
+        endif
+      endfor
+      if tp_key != '' and collections[tp_h].products_count > 0
+        assign tp_handles = tp_h
+      elsif tp_pair_h != '' and collections[tp_pair_h].products_count > 0
+        assign tp_handles = tp_pair_h
+      else
+        assign tp_handles = 'premium-bathroom-tiles'
+      endif
+    endif
+    assign tp_shop_url = collections[tp_handles].url
+  else
+    assign tp_h = tp_key | append: '-bathroom'
+    if tp_key != '' and collections[tp_h].products_count > 0
+      assign tp_handles = tp_h
+      assign tp_per = 8
+      assign tp_shop_url = collections[tp_h].url
+    elsif tp_cols != blank
+      assign tp_handles = tp_cols
+      assign tp_per = 2
+    else
+      assign tp_handles = 'luxury-shower-sets,bathroom-taps,led-mirrors,heated-towel-rails'
+      assign tp_per = 2
+    endif
+  endif
+
+  if heading != blank
+    assign tp_heading = heading
+  elsif heading_prefix != blank and tp_label != ''
+    assign tp_heading = heading_prefix | append: tp_label
+  elsif tp_mode == 'tiles'
+    if tp_label != ''
+      assign tp_heading = 'Tiles to pair with ' | append: tp_label
+    else
+      assign tp_heading = 'Bathroom tiles to go with it'
+    endif
+  else
+    if tp_label != ''
+      assign tp_heading = 'Complete the look in ' | append: tp_label
+    else
+      assign tp_heading = 'Complete your bathroom'
+    endif
+  endif
+
+  assign tp_cur_type = product.type | downcase
+  assign tp_cur_suffix = product.template_suffix
+  assign tp_count = 0
+  assign tp_seen = ''
+  assign tp_hlist = tp_handles | split: ','
+-%}
+
+{%- capture tp_cards -%}
+  {%- for hh in tp_hlist -%}
+    {%- if tp_count >= 8 -%}{%- break -%}{%- endif -%}
+    {%- assign hclean = hh | strip -%}
+    {%- assign coll = collections[hclean] -%}
+    {%- if coll == blank -%}{%- continue -%}{%- endif -%}
+    {%- if coll.products_count == 0 -%}{%- continue -%}{%- endif -%}
+    {%- assign tp_in = 0 -%}
+    {%- for p in coll.products -%}
+      {%- if tp_count >= 8 or tp_in >= tp_per -%}{%- break -%}{%- endif -%}
+      {%- if p.id == product.id -%}{%- continue -%}{%- endif -%}
+      {%- unless p.available -%}{%- continue -%}{%- endunless -%}
+      {%- if tp_mode == 'finish' -%}
+        {%- assign ptype = p.type | downcase -%}
+        {%- if tp_cur_type != blank and ptype == tp_cur_type -%}{%- continue -%}{%- endif -%}
+        {%- if tp_cur_suffix != blank and p.template_suffix == tp_cur_suffix -%}{%- continue -%}{%- endif -%}
+      {%- endif -%}
+      {%- assign pid = '|' | append: p.id | append: '|' -%}
+      {%- if tp_seen contains pid -%}{%- continue -%}{%- endif -%}
+      {%- assign tp_seen = tp_seen | append: pid -%}
+      {%- assign tp_count = tp_count | plus: 1 -%}
+      {%- assign tp_in = tp_in | plus: 1 -%}
+      <li class="tpfr__item">
+        <a class="tpfr__card" href="{{ p.url }}">
+          <span class="tpfr__img">
+            {%- if p.featured_image -%}
+              {{- p.featured_image | image_url: width: 400 | image_tag: loading: 'lazy', widths: '200, 300, 400', sizes: '(max-width: 749px) 45vw, 260px', class: 'tpfr__im' -}}
+            {%- endif -%}
+            {%- if p.compare_at_price > p.price -%}
+              {%- assign tp_save = p.compare_at_price | minus: p.price | times: 100 | divided_by: p.compare_at_price -%}
+              <span class="tpfr__badge">SAVE {{ tp_save }}%</span>
+            {%- endif -%}
+          </span>
+          <span class="tpfr__t">{{ p.title | escape }}</span>
+          <span class="tpfr__p">{{ p.price | money }}{% if p.compare_at_price > p.price %} <s>{{ p.compare_at_price | money }}</s>{% endif %}</span>
+        </a>
+      </li>
+    {%- endfor -%}
+  {%- endfor -%}
+{%- endcapture -%}
+
+{%- assign tp_cards_s = tp_cards | strip -%}
+{%- if tp_cards_s != '' -%}
+  <section class="tpfr tpfr--{{ tp_mode }}" aria-label="{{ tp_heading | escape }}">
+    <div class="tpfr__in">
+      <div class="tpfr__hd">
+        <h2 class="tpfr__h">{{ tp_heading | escape }}</h2>
+        {%- if tp_shop_url != blank -%}
+          <a class="tpfr__all" href="{{ tp_shop_url }}">Shop all &rarr;</a>
+        {%- endif -%}
+      </div>
+      <ul class="tpfr__track" role="list">{{ tp_cards }}</ul>
+    </div>
+  </section>
+  <style>
+    .tpfr{background:#f1eee8;padding:28px 0;margin:0;}
+    .tpfr--tiles{background:#f8f7f5;}
+    .tpfr__in{max-width:1200px;margin:0 auto;padding:0 22px;}
+    .tpfr__hd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:16px;}
+    .tpfr__h{font-size:24px;font-weight:800;line-height:1.15;margin:0;color:#000;}
+    .tpfr__all{font-size:14px;font-weight:700;color:#3070b7;text-decoration:none;white-space:nowrap;}
+    .tpfr__track{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x proximity;list-style:none;margin:0;padding:0 0 6px;scrollbar-width:none;}
+    .tpfr__track::-webkit-scrollbar{display:none;}
+    .tpfr__item{flex:0 0 calc((100% - 60px) / 4);min-width:0;scroll-snap-align:start;margin:0;padding:0;}
+    .tpfr__item::before{display:none;}
+    .tpfr__card{display:flex;flex-direction:column;height:100%;background:#fff;border-radius:2px;text-decoration:none;color:#151515;overflow:hidden;}
+    .tpfr__img{position:relative;display:block;padding-bottom:100%;background:#f4f4f4;}
+    .tpfr__im{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;}
+    .tpfr__badge{position:absolute;top:8px;left:8px;background:#e40012;color:#fff;font-size:12px;font-weight:800;padding:5px 8px;border-radius:2px;line-height:1;}
+    .tpfr__t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:15px;line-height:1.35;margin:10px 10px 6px;min-height:40px;}
+    .tpfr__p{font-size:18px;font-weight:800;color:#e40012;margin:0 10px 12px;}
+    .tpfr__p s{font-size:12px;font-weight:500;color:#6f6f6f;margin-left:6px;}
+    @media (max-width:749px){
+      .tpfr__item{flex-basis:calc((100% - 20px) / 2);}
+      .tpfr__h{font-size:20px;}
+      .tpfr__in{padding:0 16px;}
+    }
+  </style>
+{%- endif -%}

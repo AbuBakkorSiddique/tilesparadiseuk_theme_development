@@ -1,0 +1,45 @@
+{% for group in robots.default_groups %}
+  {{- group.user_agent }}
+
+  {%- for rule in group.rules -%}
+    {{ rule }}
+  {%- endfor -%}
+
+  {%- if group.user_agent.value == '*' -%}
+
+    {{ '# -- Faceted navigation & filters --' }}
+    {{ 'Disallow: /*?*filter*' }}
+    {{ 'Disallow: /*?*view=*' }}
+    {{ 'Disallow: /*?*sort_by=*' }}
+
+    {{ '# -- Internal search --' }}
+    {{ 'Disallow: /*?q=*' }}
+    {{ 'Disallow: /*?_pos=*' }}
+    {{ 'Disallow: /*?_sid=*' }}
+    {{ 'Disallow: /*?ss=*' }}
+
+    {{ '# -- UTM & marketing tracking --' }}
+    {{ 'Disallow: /*?utm_source=*' }}
+    {{ 'Disallow: /*?utm_medium=*' }}
+    {{ 'Disallow: /*?utm_campaign=*' }}
+    {{ 'Disallow: /*?utm_content=*' }}
+    {{ 'Disallow: /*?utm_term=*' }}
+
+    {{ '# -- Third-party app params --' }}
+    {{ 'Disallow: /*?jdgm_referral_location=*' }}
+    {{ 'Disallow: /*?pr_prod_strat=*' }}
+    {{ 'Disallow: /*?pr_rec_id=*' }}
+
+    {{ '# -- Pagination --' }}
+    {{ 'Disallow: /collections/*?page=*' }}
+    {{ 'Disallow: /blogs/*?page=*' }}
+
+    {{ '# -- Feeds --' }}
+    {{ 'Disallow: /*.atom$' }}
+
+  {%- endif -%}
+
+  {%- if group.sitemap != blank -%}
+    {{ group.sitemap }}
+  {%- endif -%}
+{% endfor %}

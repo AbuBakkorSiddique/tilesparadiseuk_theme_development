@@ -63,19 +63,28 @@
 
   <div class="announcement-bar">
     <div class="container">
-      <div class="announcement-bar__inner">
-        {%- if section.settings.link != blank -%}
-          <a href="{{ section.settings.link }}" class="announcement-bar__content announcement-bar__content--{{ section.settings.text_position }}">{{ section.settings.text | escape }}</a>
-        {%- else -%}
-          <p class="announcement-bar__content announcement-bar__content--{{ section.settings.text_position }}">{{ section.settings.text | escape }}</p>
-        {%- endif -%}
+      <div class="custom-announcement-bar" style="display: flex; overflow-x: auto;">
 
-        {%- if section.settings.show_newsletter -%}
-          <button type="button" class="announcement-bar__button hidden-phone" data-action="toggle-newsletter" aria-expanded="false" aria-controls="announcement-bar-newsletter">
-            {%- render 'icon', icon: 'newsletter' -%}
-            {{- section.settings.newsletter_button | escape -}}
-          </button>
-        {%- endif -%}
+        {% for block in section.blocks %}
+          <div class="announcement-item" {{ block.shopify_attributes }} style="white-space: nowrap;">
+
+            {% if block.settings.icon %}
+              <img 
+                src="{{ block.settings.icon | image_url: width: 40 }}" 
+                alt=""
+                class="announcement-icon"
+              >
+            {% endif %}
+
+            {% if block.settings.text != blank %}
+              <span class="announcement-text">
+                {{ block.settings.text }}
+              </span>
+            {% endif %}
+
+          </div>
+        {% endfor %}
+
       </div>
     </div>
   </div>
@@ -86,6 +95,59 @@
     background: {{ section.settings.background }};
     color: {{ section.settings.text_color }};
   }
+
+  .custom-announcement-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+  padding: 10px 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.announcement-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+/* Divider line */
+.announcement-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 18px;
+  width: 1px;
+  background: rgba(255,255,255,0.4);
+}
+
+.announcement-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.announcement-text {
+  white-space: nowrap;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .custom-announcement-bar {
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding: 8px 15px;
+    gap: 20px;
+  }
+
+  .announcement-item::after {
+    display: none;
+  }
+}
 </style>
 
 <script>
@@ -179,9 +241,27 @@
       "type": "richtext",
       "id": "newsletter_content",
       "label": "Text",
-      "default": "<p>A short sentence describing what someone will receive by subscribing</p>",
-      "visible_if": "{{ section.settings.show_newsletter }}"
+      "default": "<p>A short sentence describing what someone will receive by subscribing</p>"
     }
-  ]
+  ],
+  "blocks": [
+  {
+    "type": "item",
+    "name": "Announcement Item",
+    "settings": [
+      {
+        "type": "image_picker",
+        "id": "icon",
+        "label": "Icon"
+      },
+      {
+        "type": "text",
+        "id": "text",
+        "label": "Text",
+        "default": "Fast Delivery"
+      }
+    ]
+  }
+],
 }
 {% endschema %}

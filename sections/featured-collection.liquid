@@ -1,3 +1,29 @@
+{%- comment -%}
+  tp_only_with_tiles (setting): when ticked, the section only shows if the basket has tiles
+  (sold per m²) or a pallet / job lot deal. Used for "Need Adhesive & Extras?" on the cart page.
+{%- endcomment -%}
+{%- liquid
+  assign tp_fc_show = true
+  if section.settings.tp_only_with_tiles
+    assign tp_fc_show = false
+    for li in cart.items
+      assign tp_fc_t = li.product.title | downcase
+      if tp_fc_t contains 'pallet' or tp_fc_t contains 'job lot'
+        assign tp_fc_show = true
+        break
+      endif
+      capture tp_fc_pm
+        render 'tp-per-m', product: li.product
+      endcapture
+      assign tp_fc_pm = tp_fc_pm | strip
+      if tp_fc_pm == 'y'
+        assign tp_fc_show = true
+        break
+      endif
+    endfor
+  endif
+-%}
+{%- if tp_fc_show -%}
 {%- capture section_settings -%}
 {
   "stackable": {% if section.settings.layout == 'vertical' and section.settings.stack_products == false %}false{% else %}true{% endif %},
@@ -5,13 +31,13 @@
 }
 {%- endcapture -%}
 
-<section class="section" data-section-id="{{ section.id }}" data-section-type="featured-collection" data-section-settings="{{ section_settings | escape_once }}">
+<section class="section {{ section.settings.custom_css_class }}" data-section-id="{{ section.id }}" data-section-type="featured-collection" data-section-settings='{{ section_settings }}'>
   {%- assign collection = section.settings.collection -%}
 
   <div class="container">
     <header class="section__header">
       <div class="section__header-stack">
-        <h2 class="section__title heading h3">{{ section.settings.title | default: collection.title | escape }}</h2>
+        <p class="section__title heading">{{ section.settings.title | default: collection.title | escape }}</p>
       </div>
 
       {%- if section.settings.link_title != blank -%}
@@ -43,15 +69,24 @@
             {%- endif -%}
 
             {%- if use_placeholder -%}
-              {%- render 'product-item-placeholder', product: product, grid_classes: grid_classes, show_add_to_cart: section.settings.show_quick_buy -%}
+              {%- include 'product-item-placeholder', product: product, grid_classes: grid_classes, show_add_to_cart: section.settings.show_quick_buy -%}
             {%- else -%}
-              {%- render 'product-item', product: product, grid_classes: grid_classes, show_add_to_cart: section.settings.show_quick_buy -%}
+              {%- include 'product-item',
+                product: product,
+                grid_classes: grid_classes,
+                show_add_to_cart: section.settings.show_quick_buy,
+                show_shop_button: section.settings.show_shop_button,
+                shop_button_label: section.settings.shop_button_label,
+                enable_sample_button: section.settings.enable_sample_button,
+                sample_button_label: section.settings.sample_button_label
+                show_view_button: section.settings.show_view_button
+              -%}
             {%- endif -%}
           {%- elsif section.settings.layout == 'horizontal' -%}
             {%- if use_placeholder -%}
-              {%- render 'product-item-placeholder', product: product, horizontal: true, grid_classes: '1/2--tablet 1/3--lap-and-up', show_add_to_cart: false -%}
+              {%- include 'product-item-placeholder', product: product, horizontal: true, grid_classes: '1/2--tablet 1/3--lap-and-up', show_add_to_cart: false -%}
             {%- else -%}
-              {%- render 'product-item', product: product, horizontal: true, grid_classes: '1/2--tablet 1/3--lap-and-up', show_add_to_cart: false -%}
+              {%- include 'product-item', product: product, horizontal: true, grid_classes: '1/2--tablet 1/3--lap-and-up', show_add_to_cart: false -%}
             {%- endif -%}
           {%- else -%}
             {%- assign mod = forloop.index0 | modulo: 3 -%}
@@ -64,15 +99,15 @@
 
             {%- if mod == 0 -%}
               {%- if use_placeholder -%}
-                {%- render 'product-item-placeholder', product: product, show_add_to_cart: false -%}
+                {%- include 'product-item-placeholder', product: product, show_add_to_cart: false -%}
               {%- else -%}
-                {%- render 'product-item', product: product, show_add_to_cart: false -%}
+                {%- include 'product-item', product: product, show_add_to_cart: false -%}
               {%- endif -%}
             {%- else -%}
               {%- if use_placeholder -%}
-                {%- render 'product-item-placeholder', product: product, horizontal: true, show_add_to_cart: false -%}
+                {%- include 'product-item-placeholder', product: product, horizontal: true, show_add_to_cart: false -%}
               {%- else -%}
-                {%- render 'product-item', product: product, horizontal: true, show_add_to_cart: false -%}
+                {%- include 'product-item', product: product, horizontal: true, show_add_to_cart: false -%}
               {%- endif -%}
             {%- endif -%}
 
@@ -115,6 +150,7 @@
     </div>
   </div>
 </section>
+{%- endif -%}
 
 {% schema %}
 {
@@ -165,6 +201,7 @@
       "type": "checkbox",
       "id": "stack_products",
       "label": "Stack products",
+       "info": "Only applicable if layout is set to vertical",
       "default": false,
       "visible_if": "{{ section.settings.layout == 'vertical' }}"
     },
@@ -173,7 +210,13 @@
       "id": "show_quick_buy",
       "label": "Show quick buy",
       "default": false,
-      "visible_if": "{{ section.settings.layout == 'vertical' }}"
+      "info": "Only shows if layout is set to vertical"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_view_button",
+      "label": "Show View Button",
+      "default": false
     },
     {
       "type": "text",
@@ -186,11 +229,48 @@
       "id": "link_url",
       "label": "Link URL",
       "info": "If empty, the collection URL is used."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_shop_button",
+      "label": "Show Shop Button",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "shop_button_label",
+      "label": "Shop Button Label",
+      "default": "Shop Now"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_sample_button",
+      "label": "Show Sample Button",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "sample_button_label",
+      "label": "Sample Button Label",
+      "default": "Order Sample"
+    },
+    {
+      "type": "text",
+      "id": "custom_css_class",
+      "label": "Custom CSS Class",
+      "info": "Add custom class names separated by spaces"
+    },
+    {
+      "type": "checkbox",
+      "id": "tp_only_with_tiles",
+      "label": "Only show when the basket has tiles",
+      "info": "For the cart page: hides this section unless there are tiles or a pallet deal in the basket.",
+      "default": false
     }
-  ],
+    ],
   "presets": [
     {
-      "category": "Collections",
+      "category": "Collection",
       "name": "Featured collection",
       "settings": {}
     }

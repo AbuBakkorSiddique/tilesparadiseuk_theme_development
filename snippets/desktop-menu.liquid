@@ -48,7 +48,7 @@ always visible.
         {%- endif -%}
       {%- endfor -%}
 
-      <li class="nav-dropdown__item {% if is_mega_menu %}has-mega-menu{% endif %}">
+      <li class="nav-dropdown__items {% if is_mega_menu %}has-mega-menu{% endif %}">
         {%- if link.links.size == 0 -%}
           <a href="{{ link.url }}" class="nav-dropdown__link link" data-type="menuitem">{{ link.title }}</a>
         {%- else -%}
@@ -58,11 +58,11 @@ always visible.
           {%- if is_mega_menu -%}
             {%- render 'mega-menu', is_floating: is_floating, mega_menu: link, index: index_nested -%}
           {%- else -%}
-            <ul id="{{ index_nested }}" class="nav-dropdown {% if is_floating %}nav-dropdown--floating{% endif %}" data-type="menu" aria-hidden="true" role="list">
+            <ul id="{{ index_nested }}" class="nav-dropdowns {% if is_floating %}nav-dropdown--floating{% endif %}" data-type="menu" aria-hidden="true" role="list">
               {%- render 'icon', icon: 'nav-triangle-left' -%}
 
               {%- for sub_link in link.links -%}
-                <li class="nav-dropdown__item">
+                <li class="nav-dropdown__items">
                   {%- if sub_link.links.size == 0 -%}
                     <a href="{{ sub_link.url }}" class="nav-dropdown__link link" data-type="menuitem">{{ sub_link.title }}</a>
                   {%- else -%}

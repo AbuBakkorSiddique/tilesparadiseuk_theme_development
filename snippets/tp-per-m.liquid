@@ -1,0 +1,39 @@
+{%- comment -%}
+  Per m² rule (Tiles Paradise). Outputs "y" when a product is sold per square metre
+  (tiles, SPC flooring), otherwise "n". Used by the product page price and quantity,
+  product cards, collection/search grids, best sellers and the low-stock line.
+  A product is NOT per m² when any of these apply:
+  1. It uses a non-tile product template (taps, toilets, showers, mirrors, heating, valves, wastes, accessories).
+  2. It has a product type that isn't a tile type (taps, toilets, showers, heating, job lots, pallet deals...).
+  3. It is tagged Samples.
+  4. It sits in a non-tile collection (adhesive, grout, matting, backerboards, underfloor heating,
+     showers, mirrors, toilets, radiators, towel rails, job lot deals, pallet deals).
+{%- endcomment -%}
+{%- liquid
+  assign tp_pm = 'y'
+  assign tp_pm_nt = 'taps,kitchen-taps,boiling-taps,toilets,shower,showers,mirrors-v2,mirrors,led-mirrors,radiator-v3,radiators,towel-rails,radiator-valves,wastes,bath-accessories' | split: ','
+  if product.template_suffix != blank and tp_pm_nt contains product.template_suffix
+    assign tp_pm = 'n'
+  endif
+  if tp_pm == 'y'
+    assign tp_pm_type = product.type | downcase
+    if tp_pm_type != blank
+      unless tp_pm_type contains 'tile'
+        assign tp_pm = 'n'
+      endunless
+    endif
+  endif
+  if tp_pm == 'y' and product.tags contains 'Samples'
+    assign tp_pm = 'n'
+  endif
+  if tp_pm == 'y'
+    for tp_pm_c in product.collections
+      assign tp_pm_t = tp_pm_c.title
+      if tp_pm_t contains 'Adhesive' or tp_pm_t contains 'Underfloor Heating' or tp_pm_t contains 'Grout' or tp_pm_t contains 'Matting' or tp_pm_t contains 'Backerboards' or tp_pm_t contains 'Showers' or tp_pm_t contains 'Mirrors' or tp_pm_t contains 'Toilets' or tp_pm_t contains 'Radiators' or tp_pm_t contains 'Towel Rails' or tp_pm_t contains 'Job Lot Deals' or tp_pm_t contains 'Wholesale Pallet Deals'
+        assign tp_pm = 'n'
+        break
+      endif
+    endfor
+  endif
+  echo tp_pm
+-%}

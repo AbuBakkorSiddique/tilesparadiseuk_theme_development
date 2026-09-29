@@ -1,0 +1,25 @@
+{%- comment -%}
+  Outputs the finishes to look for when matching accessories to a product, best first,
+  e.g. "brushed brass,chrome". Chrome is the fallback for every finish.
+  Reads custom.colour_name, then the product title.
+{%- endcomment -%}
+{%- liquid
+  assign tf_hay = product.metafields.custom.colour_name.value | append: ' ' | append: product.title | downcase
+  if tf_hay contains 'antique'
+    echo 'antique brass,brushed brass,chrome'
+  elsif tf_hay contains 'nickel'
+    echo 'brushed nickel,chrome'
+  elsif tf_hay contains 'brass' or tf_hay contains 'gold'
+    echo 'brushed brass,chrome'
+  elsif tf_hay contains 'black'
+    echo 'matt black,chrome'
+  elsif tf_hay contains 'anthracite'
+    echo 'anthracite grey,textured grey,chrome'
+  elsif tf_hay contains 'gunmetal' or tf_hay contains 'grey'
+    echo 'textured grey,anthracite grey,chrome'
+  elsif tf_hay contains 'white'
+    echo 'white,white & chrome,chrome'
+  else
+    echo 'chrome'
+  endif
+-%}

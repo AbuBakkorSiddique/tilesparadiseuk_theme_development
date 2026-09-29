@@ -141,13 +141,6 @@
         },
         {
           "type": "checkbox",
-          "id": "stretch_image",
-          "label": "Stretch image (1000 x 500px .jpg recommended)",
-          "default": false,
-          "visible_if": "{{ block.settings.image != blank }}"
-        },
-        {
-          "type": "checkbox",
           "id": "show_overlay",
           "label": "Show overlay",
           "info": "Increase text readability on busy images.",
@@ -161,8 +154,13 @@
           "max": 100,
           "step": 1,
           "unit": "%",
-          "default": 50,
-          "visible_if": "{{ block.settings.show_overlay }}"
+          "default": 50
+        },
+        {
+          "type": "checkbox",
+          "id": "stretch_image",
+          "label": "Stretch image (1000 x 500px .jpg recommended)",
+          "default": false
         },
         {
           "type": "color",
@@ -230,8 +228,7 @@
               "label": "Bottom right"
             }
           ],
-          "default": "top_left",
-          "visible_if": "{{ block.settings.title != blank or block.settings.content != blank }}"
+          "default": "top_left"
         },
         {
           "type": "header",
@@ -265,7 +262,7 @@
   ],
   "presets": [
     {
-      "category": "Storytelling",
+      "category": "Text",
       "name": "Promotion blocks",
       "settings": {},
       "blocks": [

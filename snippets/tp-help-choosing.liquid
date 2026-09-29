@@ -1,0 +1,320 @@
+{%- comment -%}
+  TP help choosing: short buying guide per product category, with a quick helper where one
+  question settles it. Used by the "TP help & FAQs" section on product pages.
+  Params: product, cat (tiles, taps, kitchen-taps, boiling-taps, shower, toilets, mirrors,
+          radiator-v3, towel-rails, radiator-valves, wastes, bath-accessories)
+  Helpers: heat output (radiators, towel rails), water pressure (taps, showers),
+           valve type (valves), slotted or unslotted (wastes), mirror width (mirrors).
+  Product facts come from metafields; any that are empty are simply left out.
+{%- endcomment -%}
+{%- liquid
+  assign c = product.metafields.custom
+  assign hc_id = 'tphc-' | append: product.id
+  assign hc_title = product.title | downcase
+-%}
+<div class="tp-hc" id="{{ hc_id }}" data-cat="{{ cat }}">
+
+{%- case cat -%}
+
+  {%- when 'tiles' -%}
+    {%- liquid
+      assign t_surface = c.tile_surface.value | default: c.floor_or_wall.value | append: ''
+      assign t_rect = c.rectified.value | append: '' | downcase
+      assign t_ufh = c.suitable_for_underfloor_heating.value | append: '' | strip
+      assign t_slip = c.slip_rating.value | append: '' | strip
+    -%}
+    <ul class="tp-hc__facts">
+      {%- if c.size.value != blank -%}<li><span>Size</span><b>{{ c.size.value | replace: 'Large ', '' | replace: 'Medium ', '' | replace: 'Small ', '' | replace: 'Other ', '' | remove: '(' | remove: ')' }}</b></li>{%- endif -%}
+      {%- if c.tile_finish.value != blank -%}<li><span>Finish</span><b>{{ c.tile_finish.value }}</b></li>{%- endif -%}
+      {%- if c.tile_material.value != blank -%}<li><span>Material</span><b>{{ c.tile_material.value }}</b></li>{%- endif -%}
+      {%- if t_surface != '' -%}<li><span>Use on</span><b>{{ t_surface | replace: 'Both', 'Floor & Wall' }}</b></li>{%- endif -%}
+      {%- if c.thickness.value != blank -%}<li><span>Thickness</span><b>{{ c.thickness.value }}</b></li>{%- endif -%}
+      {%- if t_rect != '' -%}<li><span>Rectified</span><b>{{ c.rectified.value }}</b></li>{%- endif -%}
+      {%- if t_ufh != '' -%}<li><span>Underfloor heating</span><b>{{ t_ufh }}</b></li>{%- endif -%}
+      {%- if t_slip != '' -%}<li><span>Slip rating</span><b>{{ t_slip }}</b></li>{%- endif -%}
+    </ul>
+    <ol class="tp-hc__steps">
+      <li><b>Check where it can go.</b> Floors need a tile rated for floors. In showers and wet rooms, a matt or anti-slip finish is safer underfoot than polished.</li>
+      <li><b>Measure and add 10%.</b> Length x width for each area, added together, plus 10% for cuts and breakage (15% for herringbone or diagonal layouts). The calculator above does this for you.</li>
+      <li><b>Pick your joint.</b> {% if t_rect contains 'y' %}This tile is rectified (precision-cut edges), so a slim 2mm joint gives a near-seamless look.{% else %}Rectified tiles take a slim 2mm joint; non-rectified tiles need about 3mm.{% endif %} Large tiles need a flat surface; levelling clips help.</li>
+      <li><b>Order it all together.</b> Tiles are made in batches that can vary slightly in shade, so buy the full amount in one order.</li>
+      <li><b>See it first.</b> Order a sample to check the colour and finish in your own light.</li>
+    </ol>
+
+  {%- when 'towel-rails', 'radiator-v3' -%}
+    {%- liquid
+      assign r_ho = c.heat_output.value | append: ''
+      assign r_btu = 0
+      assign r_nums = r_ho | replace: ',', '' | replace: '–', ' ' | replace: '-', ' ' | replace: '(', ' ' | replace: ')', ' ' | replace: '+', ' ' | replace: '≤', ' ' | split: ' '
+      for n in r_nums
+        assign nn = n | plus: 0
+        if nn > r_btu
+          assign r_btu = nn
+        endif
+      endfor
+      if cat == 'towel-rails' or product.type contains 'Towel'
+        assign r_is_rail = true
+      else
+        assign r_is_rail = false
+      endif
+    -%}
+    <p class="tp-hc__lead">{% if r_is_rail %}A towel rail should keep the bathroom warm, not just dry towels. Check it's powerful enough for the room.{% else %}Size a radiator by heat output (BTU), not by how it looks on the wall.{% endif %}</p>
+    <div class="tp-hc__tool" data-hc-btu data-btu="{{ r_btu }}" data-rail="{{ r_is_rail }}">
+      <div class="tp-hc__tool-h">How much heat does your room need?</div>
+      <div class="tp-hc__fields">
+        <label>Length (m)<input type="number" inputmode="decimal" step="0.1" min="0" data-f="l" placeholder="3"></label>
+        <label>Width (m)<input type="number" inputmode="decimal" step="0.1" min="0" data-f="w" placeholder="2.5"></label>
+        <label>Height (m)<input type="number" inputmode="decimal" step="0.1" min="0" data-f="h" value="2.4"></label>
+        <label>Room
+          <select data-f="room">
+            <option value="33"{% if r_is_rail %} selected{% endif %}>Bathroom / en suite</option>
+            <option value="30"{% unless r_is_rail %} selected{% endunless %}>Living room</option>
+            <option value="25">Bedroom</option>
+            <option value="25">Kitchen</option>
+            <option value="22">Hallway / landing</option>
+          </select>
+        </label>
+        <label>Windows
+          <select data-f="glaze"><option value="1">Double glazed</option><option value="1.15">Single glazed</option></select>
+        </label>
+        <label>Outside walls
+          <select data-f="walls"><option value="1">0 or 1</option><option value="1.1">2 or more</option></select>
+        </label>
+      </div>
+      <p class="tp-hc__out" data-out>Enter your room size to see the heat output you need.</p>
+    </div>
+    <ol class="tp-hc__steps">
+      <li><b>Match the output to the room.</b> Use the BTU figure from the calculator. In a bathroom, a towel rail alone often heats a small room; bigger rooms may need a radiator too.</li>
+      <li><b>Check your connections.</b> Measure the gap between your pipes and choose valves to suit: angled, straight or corner (see the valve helper on our valve pages).</li>
+      <li><b>Heat pump?</b> At the lower water temperatures heat pumps run at, expect roughly half the listed output.</li>
+      <li><b>Summer use.</b> Central heating rails only warm up when the heating is on. A dual fuel kit adds an electric element where the rail supports it.</li>
+    </ol>
+
+  {%- when 'taps', 'kitchen-taps', 'boiling-taps', 'shower' -%}
+    {%- liquid
+      assign w_min = c.min_water_pressure.value | append: '' | strip
+      assign w_bar = w_min | remove: 'bar' | remove: 'Bar' | remove: 'BAR' | strip | split: ' ' | first | plus: 0
+    -%}
+    <div class="tp-hc__tool" data-hc-press data-min="{{ w_bar }}">
+      <div class="tp-hc__tool-h">Will it work with your water system?</div>
+      <div class="tp-hc__fields">
+        <label class="tp-hc__wide">How is your hot water heated?
+          <select data-f="sys">
+            <option value="">Choose one</option>
+            <option value="combi">Combi boiler (no hot water tank)</option>
+            <option value="unvented">Unvented cylinder, e.g. Megaflo (tank, no loft tank)</option>
+            <option value="gravity">Hot water tank with a cold tank in the loft</option>
+            <option value="unsure">Not sure</option>
+          </select>
+        </label>
+      </div>
+      <p class="tp-hc__out" data-out>{% if w_min != '' %}This {% if cat == 'shower' %}shower{% else %}tap{% endif %} needs at least {{ w_min }}{% unless w_min contains 'bar' or w_min contains 'Bar' %} bar{% endunless %}. Choose your system to check.{% else %}Choose your system to see what to look for.{% endif %}</p>
+    </div>
+    <ol class="tp-hc__steps">
+      {%- if cat == 'shower' -%}
+        <li><b>Exposed or concealed?</b> Exposed valves sit on the wall and are easiest to fit or swap. Concealed valves go inside the wall for a clean look and are best fitted while the bathroom is being redone.</li>
+        <li><b>Outlets.</b> 1 outlet runs one head; 2 outlets add a handset; 3 outlets add a bath spout or body jets.</li>
+        <li><b>Thermostatic is safer.</b> It holds the temperature steady when someone runs a tap elsewhere.</li>
+      {%- elsif cat == 'boiling-taps' -%}
+        <li><b>Cupboard space.</b> The tank sits under the sink; check the space before ordering.</li>
+        <li><b>3-in-1 or 4-in-1.</b> 4-in-1 adds filtered cold water; a chiller adds chilled.</li>
+        <li><b>Filters.</b> Change the filter about every 6 months to protect the tank from limescale.</li>
+      {%- else -%}
+        <li><b>Count the tap holes.</b> Mono mixers need 1 hole, pillar taps 2, 3-hole mixers 3; wall-mounted taps need none.</li>
+        <li><b>Check the spout reach and height.</b> On a vessel or countertop basin, choose a tall mixer or a wall-mounted tap.</li>
+        <li><b>Waste.</b> If a waste isn't included, choose slotted for a basin with an overflow and unslotted for one without.</li>
+      {%- endif -%}
+      <li><b>Match your finish.</b> Stick to one finish name across taps, shower and accessories so everything matches.</li>
+    </ol>
+
+  {%- when 'radiator-valves' -%}
+    {%- liquid
+      assign v_this = ''
+      if hc_title contains 'corner'
+        assign v_this = 'corner'
+      elsif hc_title contains 'angled'
+        assign v_this = 'angled'
+      elsif hc_title contains 'straight'
+        assign v_this = 'straight'
+      endif
+    -%}
+    <div class="tp-hc__tool" data-hc-valve data-this="{{ v_this }}">
+      <div class="tp-hc__tool-h">Which valve shape do you need?</div>
+      <div class="tp-hc__fields">
+        <label>Your pipes come out of the
+          <select data-f="pipe"><option value="">Choose</option><option value="floor">Floor</option><option value="wall">Wall</option></select>
+        </label>
+        <label>The radiator connects at the
+          <select data-f="conn"><option value="">Choose</option><option value="side">Side</option><option value="under">Underneath</option></select>
+        </label>
+      </div>
+      <p class="tp-hc__out" data-out>Answer both to see the right valve.</p>
+    </div>
+    <ol class="tp-hc__steps">
+      <li><b>Valves come in pairs.</b> One controls the heat and one (the lockshield) balances the system. A pair does one radiator.</li>
+      <li><b>Pipe size.</b> Most UK homes use 15mm pipe; older or microbore systems use 8 or 10mm and need an adaptor.</li>
+      <li><b>Thermostatic or manual.</b> Thermostatic valves (TRVs) hold the room at the temperature you set. In the room with the wall thermostat, use manual valves.</li>
+    </ol>
+
+  {%- when 'wastes' -%}
+    {%- liquid
+      assign ws_this = ''
+      if hc_title contains 'unslotted'
+        assign ws_this = 'unslotted'
+      elsif hc_title contains 'slotted'
+        assign ws_this = 'slotted'
+      elsif hc_title contains 'universal'
+        assign ws_this = 'universal'
+      endif
+    -%}
+    <div class="tp-hc__tool" data-hc-waste data-this="{{ ws_this }}">
+      <div class="tp-hc__tool-h">Slotted or unslotted?</div>
+      <div class="tp-hc__fields">
+        <label class="tp-hc__wide">Does your basin have an overflow hole (a small hole near the top)?
+          <select data-f="ovf"><option value="">Choose</option><option value="yes">Yes</option><option value="no">No</option></select>
+        </label>
+      </div>
+      <p class="tp-hc__out" data-out>Answer to see which waste fits.</p>
+    </div>
+    <ol class="tp-hc__steps">
+      <li><b>Click-clack or push button.</b> Both open and close with a press on the plug; neither needs a lever on the tap.</li>
+      <li><b>Add a trap.</b> The waste sits in the basin; the bottle trap underneath connects it to your waste pipe.</li>
+      <li><b>Match the finish</b> to your tap so the plug looks part of the set.</li>
+    </ol>
+
+  {%- when 'mirrors' -%}
+    {%- assign m_w = c.width.value | append: '' | remove: 'mm' | strip | plus: 0 -%}
+    <div class="tp-hc__tool" data-hc-mirror data-w="{{ m_w }}">
+      <div class="tp-hc__tool-h">Will this size suit your basin?</div>
+      <div class="tp-hc__fields">
+        <label class="tp-hc__wide">Width of your basin or vanity unit (mm)<input type="number" inputmode="numeric" min="0" step="10" data-f="basin" placeholder="600"></label>
+      </div>
+      <p class="tp-hc__out" data-out>Enter your basin width.</p>
+    </div>
+    <ol class="tp-hc__steps">
+      <li><b>No wider than the basin.</b> A mirror the same width as the basin, or up to 100mm narrower, looks balanced.</li>
+      <li><b>Safe near water.</b> IP44-rated mirrors can go in bathroom zone 2, beside and above the basin. Use a qualified electrician.</li>
+      <li><b>Shaver socket or demister?</b> A shaver socket needs a suitable supply; a demister pad keeps the glass clear after a shower.</li>
+    </ol>
+
+  {%- when 'toilets' -%}
+    <ol class="tp-hc__steps">
+      <li><b>Check the projection.</b> Measure from the wall to where the front of the pan can sit, leaving about 600mm clear in front to stand.</li>
+      <li><b>Close coupled or back to wall.</b> Close coupled has the cistern on the pan. Back to wall hides the cistern in a unit or stud wall.</li>
+      <li><b>Soil pipe position.</b> Note where your soil pipe leaves the wall or floor; the pan connector must reach it.</li>
+      <li><b>Comfort height</b> pans (about 430 to 480mm to the seat) are easier to use for taller people and anyone with mobility needs.</li>
+    </ol>
+
+  {%- when 'bath-accessories' -%}
+    <ul class="tp-hc__facts tp-hc__facts--list">
+      <li><span>Toilet roll holder</span><b>60 to 70cm from the floor, just in front of the pan</b></li>
+      <li><span>Towel ring</span><b>about 120cm high, beside the basin</b></li>
+      <li><span>Towel bar</span><b>about 120cm high, near the bath or shower</b></li>
+      <li><span>Robe hook</span><b>about 170cm high, on the back of the door or near the shower</b></li>
+      <li><span>Soap dish and tumbler</span><b>at worktop height, within reach of the basin</b></li>
+    </ul>
+    <ol class="tp-hc__steps">
+      <li><b>Screw or no-drill fixing.</b> Check the fixing in the Specification tab. Drill tiles through the middle, not at the grout line.</li>
+      <li><b>Buy the set together.</b> Pieces from the same range and finish match exactly; tick the ones you need above.</li>
+    </ol>
+
+  {%- else -%}
+    <ol class="tp-hc__steps">
+      <li><b>Check the size</b> against your space before ordering; dimensions are in the Specification tab.</li>
+      <li><b>Match your finish</b> to your other brassware so everything goes together.</li>
+    </ol>
+{%- endcase -%}
+
+  <p class="tp-hc__ask">Still not sure? <a href="/pages/contact">Send us your measurements</a> and we'll check for you.</p>
+</div>
+
+<script>
+(function(){
+  var root = document.getElementById('{{ hc_id }}');
+  if(!root || root.__hc){ return; }
+  root.__hc = true;
+  function num(el){ var v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? 0 : v; }
+  function fmt(n){ return Math.round(n).toLocaleString('en-GB'); }
+
+  var btu = root.querySelector('[data-hc-btu]');
+  if(btu){
+    var out = btu.querySelector('[data-out]'), has = parseFloat(btu.getAttribute('data-btu')) || 0;
+    var rail = btu.getAttribute('data-rail') === 'true';
+    var run = function(){
+      var f = function(k){ return btu.querySelector('[data-f="' + k + '"]'); };
+      var vol = num(f('l')) * num(f('w')) * (num(f('h')) || 2.4);
+      if(vol <= 0){ out.textContent = 'Enter your room size to see the heat output you need.'; out.className = 'tp-hc__out'; return; }
+      var watts = vol * num(f('room')) * (num(f('glaze')) || 1) * (num(f('walls')) || 1);
+      var need = watts * 3.412;
+      var msg = 'Your room needs about <b>' + fmt(need) + ' BTU</b> (' + fmt(watts) + ' W).';
+      var cls = 'tp-hc__out';
+      if(has > 0){
+        if(has >= need){ msg += ' This ' + (rail ? 'rail' : 'radiator') + ' gives up to ' + fmt(has) + ' BTU, so it should heat the room on its own.'; cls += ' is-good'; }
+        else { msg += ' This ' + (rail ? 'rail' : 'radiator') + ' gives up to ' + fmt(has) + ' BTU, about ' + Math.round(has / need * 100) + '% of that. Pick a bigger size or add a radiator.'; cls += ' is-warn'; }
+      }
+      out.innerHTML = msg; out.className = cls;
+    };
+    btu.addEventListener('input', run); btu.addEventListener('change', run);
+  }
+
+  var pr = root.querySelector('[data-hc-press]');
+  if(pr){
+    var pout = pr.querySelector('[data-out]'), min = parseFloat(pr.getAttribute('data-min')) || 0;
+    pr.addEventListener('change', function(){
+      var sys = pr.querySelector('[data-f="sys"]').value, msg = '', cls = 'tp-hc__out';
+      if(sys === 'combi' || sys === 'unvented'){
+        msg = (sys === 'combi' ? 'Combi boilers' : 'Unvented cylinders') + ' usually give 1.5 to 3 bar. ';
+        if(min > 0){ msg += min <= 1.5 ? 'That’s plenty for this one (needs ' + min + ' bar).' : 'This one needs ' + min + ' bar, so check your pressure first.'; cls += min <= 1.5 ? ' is-good' : ' is-warn'; }
+        else { msg += 'Most taps and showers work well on this.'; cls += ' is-good'; }
+      } else if(sys === 'gravity'){
+        msg = 'Gravity-fed systems often give only 0.1 to 0.5 bar. ';
+        if(min > 0){ msg += min <= 0.2 ? 'This one is fine on low pressure (needs ' + min + ' bar).' : 'This one needs ' + min + ' bar, so you’d need a pump, or choose a low-pressure model.'; cls += min <= 0.2 ? ' is-good' : ' is-warn'; }
+        else { msg += 'Choose a model marked for low pressure, or add a pump.'; cls += ' is-warn'; }
+      } else if(sys === 'unsure'){
+        msg = 'If there’s a cold water tank in your loft, you’re probably on low pressure. Send us your boiler model and we’ll check.';
+      } else { return; }
+      pout.innerHTML = msg; pout.className = cls;
+    });
+  }
+
+  var va = root.querySelector('[data-hc-valve]');
+  if(va){
+    var vout = va.querySelector('[data-out]'), vthis = va.getAttribute('data-this');
+    va.addEventListener('change', function(){
+      var p = va.querySelector('[data-f="pipe"]').value, c = va.querySelector('[data-f="conn"]').value;
+      if(!p || !c){ vout.textContent = 'Answer both to see the right valve.'; vout.className = 'tp-hc__out'; return; }
+      var need = (p === 'floor' && c === 'side') ? 'angled' : (p === 'floor' && c === 'under') ? 'straight' : (p === 'wall' && c === 'side') ? 'corner' : 'angled';
+      var msg = 'You need <b>' + need + '</b> valves.';
+      var cls = 'tp-hc__out';
+      if(vthis){ if(vthis === need){ msg += ' These are ' + vthis + ', so they’ll fit.'; cls += ' is-good'; } else { msg += ' These are ' + vthis + ', so look at our ' + need + ' valves instead.'; cls += ' is-warn'; } }
+      vout.innerHTML = msg; vout.className = cls;
+    });
+  }
+
+  var ws = root.querySelector('[data-hc-waste]');
+  if(ws){
+    var wout = ws.querySelector('[data-out]'), wthis = ws.getAttribute('data-this');
+    ws.addEventListener('change', function(){
+      var o = ws.querySelector('[data-f="ovf"]').value;
+      if(!o){ return; }
+      var need = o === 'yes' ? 'slotted' : 'unslotted';
+      var msg = 'You need a <b>' + need + '</b> waste.', cls = 'tp-hc__out';
+      if(wthis === 'universal'){ msg += ' This one is universal, so it fits either way.'; cls += ' is-good'; }
+      else if(wthis){ if(wthis === need){ msg += ' This one is ' + wthis + ', so it will fit.'; cls += ' is-good'; } else { msg += ' This one is ' + wthis + '; choose a ' + need + ' waste instead.'; cls += ' is-warn'; } }
+      wout.innerHTML = msg; wout.className = cls;
+    });
+  }
+
+  var mi = root.querySelector('[data-hc-mirror]');
+  if(mi){
+    var mout = mi.querySelector('[data-out]'), mw = parseFloat(mi.getAttribute('data-w')) || 0;
+    mi.addEventListener('input', function(){
+      var b = num(mi.querySelector('[data-f="basin"]'));
+      if(b <= 0){ mout.textContent = 'Enter your basin width.'; mout.className = 'tp-hc__out'; return; }
+      var msg = 'Look for a mirror <b>' + fmt(Math.max(300, b - 100)) + ' to ' + fmt(b) + 'mm</b> wide.', cls = 'tp-hc__out';
+      if(mw > 0){ if(mw <= b && mw >= b - 150){ msg += ' This one is ' + fmt(mw) + 'mm, a good fit.'; cls += ' is-good'; } else if(mw > b){ msg += ' This one is ' + fmt(mw) + 'mm, wider than your basin.'; cls += ' is-warn'; } else { msg += ' This one is ' + fmt(mw) + 'mm, on the small side.'; cls += ' is-warn'; } }
+      mout.innerHTML = msg; mout.className = cls;
+    });
+  }
+})();
+</script>

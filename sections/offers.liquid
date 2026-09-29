@@ -1,4 +1,4 @@
-<section class="section" data-section-id="{{ section.id }}" data-section-type="offers">
+<section class="{{ section.settings.cstm_cls}} section" data-section-id="{{ section.id }}" data-section-type="offers">
   <div class="container">
     {%- capture block_list -%}
       <div class="block-list">
@@ -44,6 +44,11 @@
 {
   "name": "Offers",
   "settings": [
+{
+     "type": "text",
+      "id": "cstm_cls",
+      "label": "custom class"
+},
     {
       "type": "range",
       "id": "items_per_row",

@@ -41,8 +41,8 @@
 
         <div class="mini-cart__line-item-list">
           {%- for line_item in cart.items -%}
-            <div class="mini-cart__line-item">
-              {%- if line_item.image != blank -%}
+            <div class="mini-cart__line-item" data-place= "{{ forloop.index }}">
+              {%- if line_item.image -%}
                 <div class="mini-cart__image-wrapper">
                   {%- comment -%}For vertical images we force to contain them on a square ratio to avoid growing too large{%- endcomment -%}
 
@@ -72,9 +72,11 @@
                       {%- endunless -%}
                     {%- endif -%}
                   {%- endunless -%}
-
+                  {%- if line_item.final_price == 0 -%}
+                    {{ line_item.title }}
+                    {% else %}
                   <a href="{{ line_item.url }}" class="mini-cart__product-title text--strong link">{{ line_item.title }}</a>
-
+                  {% endif %}
                   {%- if line_item.selling_plan_allocation -%}
                     <p class="mini-cart__plan-allocation">{{ line_item.selling_plan_allocation.selling_plan.name }}</p>
                   {%- endif -%}
@@ -90,6 +92,7 @@
 
                         <li class="mini-cart__property">{{ property.first }}: {{ property.last }}</li>
                       {%- endfor -%}
+                    
                     </ul>
                   {%- endunless -%}
 
@@ -112,10 +115,17 @@
                     {%- endif -%}
                   </div>
 
-                  {%- if line_item.unit_price -%}
+                  {%- if line_item.unit_price_measurement -%}
                     <div class="mini-cart__price-info">
                       <div class="unit-price-measurement">
-                        {{- line_item.unit_price | unit_price_with_measurement: line_item.unit_price_measurement -}}
+                        <span class="unit-price-measurement__price">{{ line_item.unit_price | money }}</span>
+                        <span class="unit-price-measurement__separator">/ </span>
+
+                        {%- if line_item.unit_price_measurement.reference_value != 1 -%}
+                          <span class="unit-price-measurement__reference-value">{{ line_item.unit_price_measurement.reference_value }}</span>
+                        {%- endif -%}
+
+                        <span class="unit-price-measurement__reference-unit">{{ line_item.unit_price_measurement.reference_unit }}</span>
                       </div>
                     </div>
                   {%- endif -%}
@@ -136,35 +146,23 @@
                 {%- unless line_item.product.tags contains '__gift' -%}
                   <div class="mini-cart__quantity">
                     <div class="quantity-selector">
-                      {% liquid
-                        assign max_quantity = ''
-                        assign variant = line_item.variant
-                  
-                        if variant.inventory_management != blank and variant.inventory_policy == 'deny'
-                          assign current_quantity_for_variant = cart | item_count_for_variant: variant.id
-                          assign max_quantity = variant.inventory_quantity | minus: current_quantity_for_variant | plus: line_item.quantity
-                        endif
-                  
-                        if variant.quantity_rule.max != nil
-                          assign max_quantity = max_quantity | default: 999999 | at_most: variant.quantity_rule.max
-                        endif
+                      {%- assign allow_to_add_more = true -%}
 
-                        assign increment = line_item.quantity | plus: line_item.variant.quantity_rule.increment
+                      {%- if line_item.variant.inventory_management and line_item.variant.inventory_policy == 'deny' and line_item.quantity == line_item.variant.inventory_quantity -%}
+                        {%- assign allow_to_add_more = false -%}
+                      {%- endif -%}
 
-                        if line_item.variant.quantity_rule.max != nil
-                          assign increment = increment | at_most: line_item.variant.quantity_rule.max
-                        endif
-                      %}
-
-                      <button class="quantity-selector__button" data-action="decrease-quantity" data-quantity="{{ line_item.quantity | minus: line_item.variant.quantity_rule.increment | at_least: 0 }}" data-line="{{ forloop.index }}" aria-label="{{ 'cart.items.decrease_quantity' | t }}" title="{{ 'cart.items.decrease_quantity' | t }}">{% render 'icon', icon: 'minus' %}</button>
-                      <input aria-label="{{ 'product.form.quantity' | t }}" class="quantity-selector__value" type="number" inputmode="numeric" data-current-value="{{ line_item.quantity }}" data-line="{{ forloop.index }}" value="{{ line_item.quantity }}" step="{{ line_item.variant.quantity_rule.increment }}" min="{{ line_item.variant.quantity_rule.min }}" {% if line_item.variant.quantity_rule.max != nil %}max="{{ line_item.variant.quantity_rule.max }}"{% endif %}>
-                      <button class="quantity-selector__button" data-action="increase-quantity" data-quantity="{{ increment }}" data-line="{{ forloop.index }}" {% if max_quantity == blank or line_item.quantity < max_quantity %}aria-label="{{ 'cart.items.increase_quantity' | t }}" title="{{ 'cart.items.increase_quantity' | t }}"{% else %}disabled="disabled" aria-label="{{ 'cart.items.no_more_stock' | t }}" data-tooltip="{{ 'cart.items.no_more_stock' | t }}" data-tooltip-position="bottom-left"{% endif %}>{% render 'icon', icon: 'plus' %}</button>
+                      <button index= "{{ forloop.index }}"data-id ="{{ line_item.id }}" class="quantity-selector__button" data-action="decrease-quantity" data-quantity="{{ line_item.quantity | minus: 1 }}" data-line="{{ forloop.index }}" aria-label="{{ 'cart.items.decrease_quantity' | t }}" title="{{ 'cart.items.decrease_quantity' | t }}">{% render 'icon', icon: 'minus' %}</button>
+                      <input aria-label="{{ 'product.form.quantity' | t }}" class="quantity-selector__value" inputmode="numeric" data-current-value="{{ line_item.quantity }}" data-line="{{ forloop.index }}" value="{{ line_item.quantity }}" size="{{ line_item.quantity | append: '' | size | at_least: 2 }}">
+                      <button index= "{{ forloop.index }}"data-id ="{{line_item.id  }}"class="quantity-selector__button" data-action="increase-quantity" data-quantity="{{ line_item.quantity | plus: 1 }}" data-line="{{ forloop.index }}" {% if allow_to_add_more %}aria-label="{{ 'cart.items.increase_quantity' | t }}" title="{{ 'cart.items.increase_quantity' | t }}"{% else %}disabled="disabled" aria-label="{{ 'cart.items.no_more_stock' | t }}" data-tooltip="{{ 'cart.items.no_more_stock' | t }}" data-tooltip-position="bottom-left"{% endif %}>{% render 'icon', icon: 'plus' %}</button>
                     </div>
 
                     <a href="{{ routes.cart_change_url }}?quantity=0&line={{ forloop.index }}" data-action="decrease-quantity" data-quantity="0" data-line="{{ forloop.index }}" class="mini-cart__quantity-remove link">{{ 'cart.items.remove' | t }}</a>
                   </div>
                 {%- endunless -%}
               </div>
+          <input class="cart_chang" type="hidden" id="squareMetres" value="{{line_item.product.metafields.custom.tiles_per_sq  }}">
+              
             </div>
           {%- endfor -%}
         </div>
@@ -205,7 +203,7 @@
 
         <div class="mini-cart__button-container">
           <div class="button-group button-group--loose button-group--fit">
-            <a href="{{ routes.cart_url }}" class="button button--secondary" data-no-instant>{{ 'cart.general.view_cart' | t }}</a>
+            <a href="{{ routes.cart_url }}" class="button button--secondary">{{ 'cart.general.view_cart' | t }}</a>
             {%- if settings.cart_show_checkout_button -%}
               <button type="submit" name="checkout" class="button button--primary">{{ 'cart.general.checkout' | t }}</button>
             {%- endif -%}
@@ -228,3 +226,63 @@
     </div>
   {%- endif -%}
 </form>
+
+<script>
+document.addEventListener('click', function(event) {
+  // Decrease quantity
+  let decreaseBtn = event.target.closest('.mini-cart__quantity [data-action="decrease-quantity"]');
+  if (decreaseBtn) {
+    event.preventDefault();
+    handleQuantityChange(decreaseBtn, -1);
+  }
+
+  // Increase quantity
+  let increaseBtn = event.target.closest('.mini-cart__quantity [data-action="increase-quantity"]');
+  if (increaseBtn) {
+    event.preventDefault();
+    handleQuantityChange(increaseBtn, 1);
+  }
+});
+
+function handleQuantityChange(btn, delta) {
+  var prod_id = btn.getAttribute('data-id');
+  var position = btn.getAttribute('index');
+  var lineItem = btn.closest('.mini-cart__line-item');
+  var cart_posit = lineItem ? lineItem.getAttribute('data-place') : null;
+
+  setTimeout(function() {
+    if (position == cart_posit && lineItem) {
+      var qtyInput = lineItem.querySelector('.quantity-selector__value');
+      var a = qtyInput ? parseInt(qtyInput.value, 10) : 0;
+      var b = a + delta;
+      
+      var tileInput = lineItem.querySelector('.cart_chang');
+      var tile = tileInput ? parseFloat(tileInput.value) : 0;
+      var fin_met = (b * tile).toFixed(2);
+      
+      setTimeout(function() {
+        var propList = lineItem.querySelector('.mini-cart__property-list');
+        if (propList) {
+          propList.innerHTML = "<li class='mini-cart__property'>" + fin_met + "</li>";
+        }
+      }, 1500);
+      
+      fetch('/cart/change.js', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          id: prod_id,
+          quantity: b,
+          properties: { "meter": fin_met }
+        })
+      })
+      .then(response => response.json())
+      .then(data => console.log('Cart updated successfully:', data))
+      .catch(error => console.error('Error updating cart:', error));
+    }
+  }, 2000);
+}
+</script>

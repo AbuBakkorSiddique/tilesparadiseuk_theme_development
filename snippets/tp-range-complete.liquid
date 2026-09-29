@@ -1,0 +1,197 @@
+{%- comment -%}
+  TP complete the range: tick-box cards under Add to basket, like the range picker but for
+  adding several pieces at once. Each card links to its own page; ticking it adds it to the
+  selection, and one button adds everything ticked.
+    Accessories (robe hook, towel ring...): the other accessories of the same type in the same
+      range and colour -> "Complete the Velluto set".
+    Taps, showers and other range items: the range's bathroom accessories (and, on shower
+      pages, shower accessories) in the same colour -> "Matching Oriana accessories".
+  Data: custom.range (product_range metaobject: range_name + products list),
+        custom.colour_name, custom.size_name (short item name, falls back to the title).
+  Only live, in-stock pieces show. Nothing renders when there are none.
+{%- endcomment -%}
+{%- liquid
+  assign trc_range = product.metafields.custom.range.value
+  assign trc_sibs = trc_range.products.value
+  assign trc_col = product.metafields.custom.colour_name.value | strip
+  assign trc_type = product.type | downcase
+  assign trc_is_acc = false
+  if trc_type contains 'accessor'
+    assign trc_is_acc = true
+  endif
+  assign trc_is_shower = false
+  if trc_type contains 'shower' or product.template_suffix == 'shower'
+    assign trc_is_shower = true
+  endif
+
+  assign trc_name = trc_range.range_name.value | default: '' | replace: ' Accessories', '' | replace: ' accessories', '' | strip
+  if trc_is_acc
+    if trc_name != blank
+      assign trc_heading = 'Complete the ' | append: trc_name | append: ' set'
+    else
+      assign trc_heading = 'Complete the set'
+    endif
+  else
+    if trc_name != blank
+      assign trc_heading = 'Matching ' | append: trc_name | append: ' accessories'
+    else
+      assign trc_heading = 'Matching accessories'
+    endif
+  endif
+
+  assign trc_count = 0
+  assign trc_max = 8
+-%}
+
+{%- if trc_sibs != blank and trc_col != blank -%}
+  {%- capture trc_cards -%}
+    {%- for s in trc_sibs -%}
+      {%- if trc_count >= trc_max -%}{%- break -%}{%- endif -%}
+      {%- if s.id == product.id -%}{%- continue -%}{%- endif -%}
+      {%- unless s.available -%}{%- continue -%}{%- endunless -%}
+      {%- liquid
+        assign s_col = s.metafields.custom.colour_name.value | strip
+        assign s_type = s.type | downcase
+        assign s_ok = false
+        if s_col == trc_col
+          if trc_is_acc
+            if s_type == trc_type
+              assign s_ok = true
+            endif
+          else
+            if s_type contains 'bathroom accessor'
+              assign s_ok = true
+            elsif trc_is_shower and s_type contains 'shower accessor'
+              assign s_ok = true
+            endif
+          endif
+        endif
+      -%}
+      {%- unless s_ok -%}{%- continue -%}{%- endunless -%}
+      {%- liquid
+        assign trc_count = trc_count | plus: 1
+        assign s_v = s.selected_or_first_available_variant
+        assign s_name = s.metafields.custom.size_name.value | strip
+        if s_name == blank
+          assign s_name = s.title
+        endif
+      -%}
+      <div class="tp-rc__card" data-tp-rc-card>
+        <label class="tp-rc__pick">
+          <input type="checkbox" class="tp-rc__cb" value="{{ s_v.id }}" data-price="{{ s_v.price }}" aria-label="Select {{ s.title | escape }}">
+          <span class="tp-rc__tick" aria-hidden="true"></span>
+        </label>
+        <a class="tp-rc__img" href="{{ s.url }}" title="{{ s.title | escape }}">
+          {%- if s.featured_image -%}
+            {{- s.featured_image | image_url: width: 240 | image_tag: loading: 'lazy', widths: '120, 180, 240', sizes: '120px', alt: s.title -}}
+          {%- endif -%}
+        </a>
+        <a class="tp-rc__name" href="{{ s.url }}">{{ s_name | escape }}</a>
+        <span class="tp-rc__price">{{ s_v.price | money }}</span>
+      </div>
+    {%- endfor -%}
+  {%- endcapture -%}
+
+  {%- if trc_count > 0 -%}
+    <div class="tp-rc" data-tp-rc>
+      <div class="tp-rc__head">
+        <span class="tp-rc__h">{{ trc_heading | escape }}</span>
+        <span class="tp-rc__sub">In {{ trc_col | escape }}. Tick the pieces you want and add them in one go.</span>
+      </div>
+      <div class="tp-rc__grid">{{ trc_cards }}</div>
+      <div class="tp-rc__foot">
+        {%- if trc_count > 1 -%}<button type="button" class="tp-rc__all js-tp-rc-all">Select all {{ trc_count }}</button>{%- endif -%}
+        <button type="button" class="tp-rc__add js-tp-rc-add" disabled><span class="lbl">Tick the pieces you want</span></button>
+      </div>
+      <p class="tp-rc__done" hidden>Added to your basket. <a href="{{ routes.cart_url }}">View basket</a></p>
+    </div>
+    <style>
+      .tp-rc{margin:16px 0 0;font-family:"Open Sans",sans-serif;border:1px solid #e6e8eb;border-radius:12px;padding:14px;}
+      .tp-rc__head{display:flex;flex-direction:column;gap:2px;margin-bottom:12px;}
+      .tp-rc__h{font-size:14px;font-weight:800;color:#1a1d24;}
+      .tp-rc__sub{font-size:12.5px;color:#6b7280;}
+      .tp-rc__grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+      @media (max-width:420px){.tp-rc__grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+      .tp-rc__card{position:relative;display:flex;flex-direction:column;gap:4px;border:1.5px solid #e6e8eb;border-radius:10px;padding:8px;background:#fff;transition:border-color .15s,box-shadow .15s;cursor:pointer;}
+      .tp-rc__card.is-on{border-color:#1f8a4c;box-shadow:0 0 0 2px rgba(31,138,76,.15);}
+      .tp-rc__pick{position:absolute;top:6px;right:6px;z-index:2;display:block;width:26px;height:26px;margin:0;cursor:pointer;}
+      .tp-rc__cb{position:absolute;opacity:0;width:26px;height:26px;margin:0;cursor:pointer;}
+      .tp-rc__tick{display:block;width:26px;height:26px;border-radius:50%;background:#fff;border:1.5px solid #c9ced4;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+      .tp-rc__cb:checked + .tp-rc__tick{background:#1f8a4c;border-color:#1f8a4c;}
+      .tp-rc__cb:checked + .tp-rc__tick::after{content:"";display:block;width:6px;height:11px;margin:5px 0 0 9px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg);}
+      .tp-rc__cb:focus-visible + .tp-rc__tick{outline:2px solid #016FD0;outline-offset:2px;}
+      .tp-rc__img{display:block;aspect-ratio:1/1;border-radius:7px;overflow:hidden;background:#f4f4f4;}
+      .tp-rc__img img{width:100%;height:100%;object-fit:cover;display:block;}
+      .tp-rc__name{font-size:12.5px;font-weight:700;color:#1a1d24;line-height:1.3;text-decoration:none;}
+      .tp-rc__name:hover{text-decoration:underline;}
+      .tp-rc__price{font-size:13px;font-weight:800;color:#1a1d24;}
+      .tp-rc__foot{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap;}
+      .tp-rc__all{background:#fff;border:1.5px solid #1a1d24;color:#1a1d24;border-radius:9px;padding:10px 12px;font-size:13px;font-weight:700;cursor:pointer;}
+      .tp-rc__add{flex:1 1 auto;background:#1f8a4c;border:0;color:#fff;border-radius:9px;padding:11px 14px;font-size:14px;font-weight:800;cursor:pointer;}
+      .tp-rc__add:hover{background:#18703d;}
+      .tp-rc__add[disabled]{background:#9ec9ae;cursor:not-allowed;}
+      .tp-rc__done{margin:10px 0 0;font-size:13px;font-weight:600;color:#1f8a4c;}
+      .tp-rc__done a{color:#1a1d24;text-decoration:underline;}
+    </style>
+    <script>
+    (function(){
+      var money = function(p){ return '£' + (p / 100).toFixed(2); };
+      document.querySelectorAll('[data-tp-rc]').forEach(function(box){
+        if(box.__tpBound){ return; }
+        box.__tpBound = true;
+        var cbs = box.querySelectorAll('.tp-rc__cb');
+        var add = box.querySelector('.js-tp-rc-add');
+        var lbl = add.querySelector('.lbl');
+        var all = box.querySelector('.js-tp-rc-all');
+        var done = box.querySelector('.tp-rc__done');
+        function refresh(){
+          var n = 0, sum = 0;
+          cbs.forEach(function(cb){
+            var card = cb.closest('[data-tp-rc-card]');
+            if(card){ card.classList.toggle('is-on', cb.checked); }
+            if(cb.checked){ n++; sum += parseInt(cb.getAttribute('data-price'), 10) || 0; }
+          });
+          add.disabled = n === 0;
+          lbl.textContent = n === 0 ? 'Tick the pieces you want' : (n === 1 ? 'Add 1 piece · ' + money(sum) : 'Add ' + n + ' pieces · ' + money(sum));
+          if(all){ all.textContent = (n === cbs.length) ? 'Clear' : 'Select all ' + cbs.length; }
+        }
+        cbs.forEach(function(cb){ cb.addEventListener('change', refresh); });
+        box.querySelectorAll('[data-tp-rc-card]').forEach(function(card){
+          card.addEventListener('click', function(e){
+            if(e.target.closest('a') || e.target.closest('label')){ return; }
+            var cb = card.querySelector('.tp-rc__cb');
+            if(cb){ cb.checked = !cb.checked; refresh(); }
+          });
+        });
+        if(all){
+          all.addEventListener('click', function(){
+            var on = Array.prototype.some.call(cbs, function(cb){ return !cb.checked; });
+            cbs.forEach(function(cb){ cb.checked = on; });
+            refresh();
+          });
+        }
+        add.addEventListener('click', function(){
+          var items = [];
+          cbs.forEach(function(cb){ if(cb.checked){ items.push({ id: cb.value, quantity: 1, properties: { '_cross_sell_source': 'complete_the_range' } }); } });
+          if(!items.length){ return; }
+          add.disabled = true;
+          lbl.textContent = 'Adding…';
+          fetch('/cart/add.js', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: items }) })
+            .then(function(r){ if(!r.ok){ throw new Error('add failed'); } return r.json(); })
+            .then(function(){
+              document.documentElement.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
+              cbs.forEach(function(cb){ cb.checked = false; });
+              refresh();
+              if(done){ done.hidden = false; }
+            })
+            .catch(function(){
+              refresh();
+              alert('Sorry, those pieces could not be added. Please try again.');
+            });
+        });
+        refresh();
+      });
+    })();
+    </script>
+  {%- endif -%}
+{%- endif -%}

@@ -8,11 +8,11 @@
 }
 {%- endcapture -%}
 
-<section class="section" data-section-id="{{ section.id }}" data-section-type="product-recommendations" data-section-settings="{{ section_settings | escape_once }}">
+<section class="section" data-section-id="{{ section.id }}" data-section-type="product-recommendations" data-section-settings='{{ section_settings }}'>
   <div class="container">
     {%- if section.settings.heading != blank -%}
       <header class="section__header">
-        <h2 class="section__title heading h3">{{ section.settings.heading | escape }}</h2>
+        <h3 class="section__title heading h3">{{ section.settings.heading | escape }}</h3>
       </header>
     {%- endif -%}
 
@@ -83,7 +83,7 @@
   ],
   "presets": [
     {
-      "category": "Products",
+      "category": "Product",
       "name": "Related products"
     }
   ]

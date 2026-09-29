@@ -11,21 +11,15 @@
   "sections": {
     "main": {
       "type": "main-blog-post",
-      "blocks": {
-        "newsletter": {
-          "type": "newsletter",
-          "settings": {}
-        },
-        "social-media": {
-          "type": "social_media",
-          "settings": {}
-        }
-      },
-      "block_order": [
-        "newsletter",
-        "social-media"
-      ],
-      "settings": {}
+      "custom_css": [],
+      "settings": {
+        "show_category": true,
+        "show_author": false,
+        "show_date": true,
+        "show_share_buttons": true,
+        "show_tags": true,
+        "show_gravatar": true
+      }
     }
   },
   "order": [

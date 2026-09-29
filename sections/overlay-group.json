@@ -17,7 +17,6 @@
     },
     "privacy-banner": {
       "type": "privacy-banner",
-      "disabled": true,
       "settings": {}
     }
   },
